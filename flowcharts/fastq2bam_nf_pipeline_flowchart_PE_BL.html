@@ -1,0 +1,94 @@
+<!--
+  ~ Copyright 2013-2024, Seqera Labs
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+</head>
+<body>
+<pre class="mermaid" style="text-align: center;">
+flowchart TB
+    subgraph " "
+    v0["Channel.fromFilePairs"]
+    v10["genome_ch"]
+    v20["blacklist_ch"]
+    end
+    v2([fastp_PE])
+    subgraph " "
+    v3[" "]
+    v4[" "]
+    v6[" "]
+    v9[" "]
+    v13[" "]
+    v15[" "]
+    v16[" "]
+    v18[" "]
+    v23[" "]
+    v27[" "]
+    v29[" "]
+    end
+    v5([fastqc_PE])
+    v8([multiqc_PE])
+    v11([bwa_index_genome])
+    v12([bwa_PE_aln])
+    v14([samtools_sort])
+    v21([bedtools_filt_blacklist])
+    v24([samtools_bl_index])
+    v25([deeptools_make_bed])
+    v28([multiqc_bam_stats])
+    v1(( ))
+    v7(( ))
+    v17(( ))
+    v19(( ))
+    v22(( ))
+    v26(( ))
+    v0 --> v1
+    v1 --> v2
+    v2 --> v5
+    v2 --> v4
+    v2 --> v3
+    v2 --> v12
+    v5 --> v6
+    v5 --> v7
+    v7 --> v8
+    v8 --> v9
+    v10 --> v11
+    v10 --> v12
+    v11 --> v12
+    v12 --> v14
+    v12 --> v13
+    v14 --> v16
+    v14 --> v15
+    v14 --> v21
+    v14 --> v17
+    v14 --> v19
+    v17 --> v18
+    v20 --> v21
+    v21 --> v24
+    v21 --> v22
+    v22 --> v23
+    v24 --> v25
+    v25 --> v26
+    v26 --> v27
+    v19 --> v28
+    v28 --> v29
+
+</pre>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, maxTextSize: Number.MAX_SAFE_INTEGER, maxEdges: Number.MAX_SAFE_INTEGER });
+</script>
+</body>
+</html>
