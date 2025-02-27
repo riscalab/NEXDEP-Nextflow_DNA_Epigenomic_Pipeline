@@ -1,0 +1,93 @@
+<!--
+  ~ Copyright 2013-2024, Seqera Labs
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+</head>
+<body>
+<pre class="mermaid" style="text-align: center;">
+flowchart TB
+    subgraph " "
+    v0["Channel.fromPath"]
+    v5["adapter_ch"]
+    v14["genome_ch"]
+    v23["blacklist_ch"]
+    end
+    v6([fastp_SE_adapter_known])
+    subgraph " "
+    v7["fastp_filt_html"]
+    v10["fastqc_html_files"]
+    v13[" "]
+    v17[" "]
+    v20["indexed_bams_ch"]
+    v21["sorted_bams_ch"]
+    v27["bed_files_norm_ch"]
+    v29[" "]
+    end
+    v9([fastqc_SE])
+    v12([multiqc_SE])
+    v15([bwa_index_genome])
+    v16([bwa_align_SE])
+    v19([samtools_sort])
+    v24([bedtools_filt_blacklist])
+    v25([samtools_bl_index])
+    v26([deeptools_make_bed])
+    v28([multiqc_bam_stats])
+    v1(( ))
+    v3(( ))
+    v8(( ))
+    v11(( ))
+    v18(( ))
+    v22(( ))
+    v0 --> v1
+    v0 --> v3
+    v5 --> v6
+    v1 --> v6
+    v3 --> v6
+    v6 --> v7
+    v6 --> v9
+    v6 --> v16
+    v6 --> v8
+    v8 --> v9
+    v9 --> v10
+    v9 --> v11
+    v11 --> v12
+    v12 --> v13
+    v14 --> v15
+    v14 --> v16
+    v15 --> v16
+    v8 --> v16
+    v16 --> v17
+    v16 --> v18
+    v18 --> v19
+    v19 --> v21
+    v19 --> v20
+    v19 --> v24
+    v19 --> v22
+    v23 --> v24
+    v24 --> v25
+    v25 --> v26
+    v26 --> v27
+    v22 --> v28
+    v28 --> v29
+
+</pre>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, maxTextSize: Number.MAX_SAFE_INTEGER, maxEdges: Number.MAX_SAFE_INTEGER });
+</script>
+</body>
+</html>
