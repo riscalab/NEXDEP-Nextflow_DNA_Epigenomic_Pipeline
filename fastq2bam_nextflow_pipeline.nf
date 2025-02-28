@@ -71,13 +71,21 @@ workflow {
 
 
     // i will use a path already in the hpc as the defualt human genome but the user can change the genome by using -genome parameter and putting the path to a new genome in the command line when calling nextflow run
-    params.genome = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/genome/Sequence/Bowtie2Index/genome.fa')
+    // this hg19 genome that i wanted to use did not have mitochondrial chromosome.
+    //params.genome = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/genome/Sequence/Bowtie2Index/genome.fa')
 
+    // this genome version to use as default will have the mitochondrial genome and it was downloaded from ucsc.
+    // i will create a process that will download all of the needed genomes and give the user acces to choose which one through the use of parameters. At a later time
+    // I like it this way anyway, becasue the genome now has an actual name I can use if I need to reference it in the pipeline.
+    params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT.fa.gz')
+    
     // this is the path to hg38 /rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa
     // putting the human genome in a channel
     // keeping the human genome in a value channel so i can have other processes run more than once.
     genome_ch = Channel.value(params.genome)
 
+    // hopefully uscs has a corresponding blacklist bed file I can use.
+    // this is the only one i see on ucsc. I dont think theres a specific version for hg19 with mitochondrial
     params.blacklist_path = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/blacklist/hg19-blacklist.v2.bed')
                 
     blacklist_ch = Channel.value(params.blacklist_path)
