@@ -72,13 +72,22 @@ workflow {
 
     // i will use a path already in the hpc as the defualt human genome but the user can change the genome by using -genome parameter and putting the path to a new genome in the command line when calling nextflow run
     // this hg19 genome that i wanted to use did not have mitochondrial chromosome.
-    //params.genome = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/genome/Sequence/Bowtie2Index/genome.fa')
+    params.genome = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/genome/Sequence/Bowtie2Index/genome.fa')
 
     // this genome version to use as default will have the mitochondrial genome and it was downloaded from ucsc.
     // i will create a process that will download all of the needed genomes and give the user acces to choose which one through the use of parameters. At a later time
     // I like it this way anyway, becasue the genome now has an actual name I can use if I need to reference it in the pipeline.
-    params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT.fa.gz')
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT.fa')
+
+    // lets try this
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT_M_both.fa')
+
+    //next try this. it didnt work as the mitochondrial genome either
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT_only2.fa')
     
+    // trying the analysis set recommended by ucsc
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/analysis_set_hg19/hg19.p13.plusMT.no_alt_analysis_set.fa')
+
     // this is the path to hg38 /rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa
     // putting the human genome in a channel
     // keeping the human genome in a value channel so i can have other processes run more than once.

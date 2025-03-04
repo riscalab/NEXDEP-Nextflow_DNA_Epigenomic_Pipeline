@@ -4,7 +4,7 @@
 #SBATCH -p hpc
 
 #get into correct conda env
-source activate fastq2bam
+conda activate fastq2bam
 
 # get arguments to pass into python
 bam=$1

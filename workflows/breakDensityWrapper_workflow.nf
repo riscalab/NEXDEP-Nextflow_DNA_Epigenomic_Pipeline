@@ -2,7 +2,14 @@
 
 
 // note: this workflow is in the workflow dir so i need to go back one dir to get the modules dir
-include {breakDensityWrapper_process} from '../modules/fastq2bam_dna_modules.nf'
+include {
+    breakDensityWrapper_process;
+    mk_break_points
+
+
+
+
+} from '../modules/fastq2bam_dna_modules.nf'
 
 workflow breakDensityWrapper_workflow {
 
@@ -21,14 +28,58 @@ workflow breakDensityWrapper_workflow {
                 .filter(~/.*bam/)
                 .set{only_bams}
 
-    only_bams.view()
+    //only_bams.view()
 
     // this workflow will take the files from the main workflow and pass them to the breakDensityWrapper process/module
+    // if (params.test) {
+    //     breakDensityWrapper_process(only_bams.collect(), peak_files.flatten().take(1)) // just for test, but i just want to take 1 peak file
+    // }
+    // else {
+    //     breakDensityWrapper_process(only_bams.collect(), peak_files.flatten())
+
+    // }
+
+    // test putting all the bam index tuple in the process
+
+    //bam_index_tuple.collect().flatten().view()
+    // bam_index_tuple
+    //     .multiMap{
+    //         file -> 
+    //         bams:  "${file[0].Parent}/${file[0].baseName}.sorted.bam" //filter(~/.*bam/) not sure why filter doesnt do what i wanted
+    //         index: "${file[1].Parent}/${file[1].baseName}.sorted.bam.bai" //filter(~/.*bai/)
+    //     }
+    //     .set{multi_bam_index_ch}
+    // multi_bam_index_ch.bams.view{file -> "bams $file"}
+    // multi_bam_index_ch.index.view{file -> "index $file"}
+    
+    
+    
+  
+    bam_index_tuple
+        .multiMap{
+            file -> 
+            bams:  file[0] //filter(~/.*bam/) not sure why filter doesnt do what i wanted
+            index: file[1] //filter(~/.*bai/)
+        }
+        .set{multi_bam_index_ch}
+    multi_bam_index_ch.bams.view{file -> "bams $file"}
+    multi_bam_index_ch.index.view{file -> "index $file"}
+    
+        
+    // getting the break points sorted bed file first
+    mk_break_points(multi_bam_index_ch.bams)
+
+    //break_sorted_bed = mk_break_points.out.sorted_break_bed
+    norm_break_files = mk_break_points.out.break_files
+    // find a way to get all bams in one channel. probaly have to collect bams then collect index using multi map to have the same order
+    // if using andrews scripts the break files still arent found so it still calculates its own.
+
+
     if (params.test) {
-        breakDensityWrapper_process(only_bams.collect(), peak_files.flatten().take(1)) // just for test, but i just want to take 1 peak file
+        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.flatten().take(1)) // just for test, but i just want to take 1 peak file
     }
     else {
-        breakDensityWrapper_process(only_bams.collect(), peak_files.flatten())
+        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.flatten())
 
     }
 

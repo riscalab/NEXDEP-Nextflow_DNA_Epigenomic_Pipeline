@@ -533,6 +533,14 @@ process bam_log_calc {
     # now only putting the stats into a tsv file
     less "${samtools_stats_log}" | grep ^SN | cut -f 2-3 >  "${tsv_file_with_stats}"
 
+    # now I want to add the option of finding the amound of reads mapped to the mitochondrial genome and append it to the file
+    # note if the user uses a genome that doesnt have chrMT or chrM or even the mitochondrial genome at all then this will give back a 0 reads mapped
+    # samtools view option -F 260 ignores all reads that are unmapped and are secondary or supplementary alignments
+    # you can also use samtools view -e 'rname=="chrMT"' bam_file | wc -l but this might include other things but i got the same numbers for the specific bam file i checked
+
+    echo -e "chrMT mapped reads:\t\$(samtools view -F 260  "${bam}"  chrMT |wc -l)" >> "${tsv_file_with_stats}"
+    echo -e "chrM mapped reads:\t\$(samtools view -F 260  "${bam}"  chrM |wc -l)" >> "${tsv_file_with_stats}"
+
 
 
 
@@ -1186,16 +1194,18 @@ process mk_break_points {
     //path(bed_peaks)
 
     output:
+    path("*breaks.bed"), emit: break_files
+    path("*breaks.sorted.bed"), emit: sorted_break_bed
 
 
     script:
 
-    out_bampe_name = "${bams.baseName}_bampe.bed"
-    break_point_name = "${bams.baseName}_breaks.bed"
-    sorted_break_point = "${bams.baseName}_sorted.bed"
+    out_bampe_name = "${bams.baseName}.bampe.bed"
+    break_point_name = "${bams.baseName}.breaks.bed"
+    sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
 
     // making sure the bed file is sorted so just doing it again
-    sorted_bed_file = 
+    //sorted_bed_file = 
 
     """
     #!/usr/bin/env bash
@@ -1226,9 +1236,9 @@ process mk_break_points {
     numBreaks=\$(wc -l "${break_point_name}")
 
 
-    bedtools sort \
-    -i "${bed}" \
-    > 
+    #bedtools sort \
+    #-i "\${bed}" \
+    #> "\${sorted_break_point}"
 
 
 
@@ -1241,6 +1251,10 @@ process mk_break_points {
 
 process breakDensityWrapper_process {
 
+    debug true
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
     publishDir "${params.base_out_dir}/break_density_calc", mode: 'copy', pattern: '*'
     
 
@@ -1248,7 +1262,12 @@ process breakDensityWrapper_process {
     // input has to be files that the breakDensityWrapper.sh script takes
     
     // it takes the bam files that have reads aligned to the reference genome. So I think it is best to collect all of the generated bams and ensure PLC is one of the bams.
-    path(bams)
+    path(bams) 
+    
+    path(index)
+
+    // now putting the sorted break files
+    path(sorted_breaks)
     
     // then it takes the peak files found in the directory  /lustre/fs4/home/ascortea/store/ascortea/beds
     path(peak_files)
@@ -1264,11 +1283,22 @@ process breakDensityWrapper_process {
 
     script:
 
+    //bam_with_sort_name = "${bams.baseName}.sorted.bam"
+    //index_with_sort_name = "${index.baseName}.sorted.bam.bai"
+
 
     """
     #!/usr/bin/env bash
 
     # nextflow can find stuff in the bin dir but not recursively, so i have to specify the sub dir
+
+    # see if i need to rename the index files here or if doing it in the nextflow portion works
+    
+    # also debug here
+    
+    echo "this is the bam file: "${bams}". And this is the index: "${index}" "
+
+    
 
     breakDensityWrapper.sh "${bams}" "${peak_files}"
     
@@ -1355,13 +1385,17 @@ process py_calc_stats_log {
     # use this code below to see the column names to choose from
     # combined_stats_df.columns
 
-    final_log_stats_df = combined_stats_df.loc[:, ['sample_names','raw total sequences:','reads mapped:','reads mapped and paired:', 'reads duplicated:', 'reads MQ0:', 'percentage of properly paired reads (%):']]
+    final_log_stats_df = combined_stats_df.loc[:, ['sample_names','raw total sequences:','reads mapped:','reads mapped and paired:', 'reads duplicated:', 'reads MQ0:', 'percentage of properly paired reads (%):', 'chrMT mapped reads:', 'chrM mapped reads:']]
 
     # calculating the percentage of reads mapped, and adding it to a column called percent_reads_mapped
     final_log_stats_df['percent_reads_mapped'] = (final_log_stats_df.iloc[:,2]/final_log_stats_df.iloc[:,1])*100
 
     # calculating the percentage of reads duplicated and adding that as a column
     final_log_stats_df['percent_reads_duplicated'] = (final_log_stats_df.iloc[:,4]/final_log_stats_df.iloc[:,1])*100
+
+    # now calculating the percentage of reads mapped to chrMT and then to chrM
+    final_log_stats_df['percent_mapped_chrMT'] = (final_log_stats_df.iloc[:,7]/final_log_stats_df.iloc[:,1])*100
+    final_log_stats_df['percent_mapped_chrM'] = (final_log_stats_df.iloc[:,8]/final_log_stats_df.iloc[:,1])*100
 
 
     # right before I make the log file I want to clean up the column names and replace and spaces with an underscore
