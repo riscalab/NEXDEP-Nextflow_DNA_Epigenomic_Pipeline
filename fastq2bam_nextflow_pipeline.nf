@@ -678,9 +678,20 @@ workflow {
 
     
     // I want to have a parameter that takes peakfiles. The default will be the IMR90 narrowPeak files
-    params.peak_files = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
+    params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
     //now making the channel for the files
-    peak_files_ch = Channel.value(params.peak_files)
+    peak_files_ch = Channel.fromPath(params.peak_files_IMR90)
+
+    // now i need to make channels with other cell lines with the narrow peaks but also get the nulls. first other peaks
+    peak_file_HUVEC = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/HUVEC/*.narrowPeak')
+    peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.narrowPeak')
+    peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*.narrowPeak')
+
+    // wondering if i can do this
+    all_peaks_ch = peak_files_ch.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
+
+    // some narrow peaks are under HUVEC/gkmsvm_null_regions/
+    // more narrow peaks are under IMR90/scrambles/ , but these ones are chunked bed files.
 
 
     if (params.calc_break_density){
@@ -688,13 +699,13 @@ workflow {
     
         if (params.PE) {
             
-            breakDensityWrapper_workflow(bam_index_tuple_ch, peak_files_ch)
+            breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
 
         }
 
         if (params.SE) {
          
-            breakDensityWrapper_workflow(bam_index_tuple_ch, peak_files_ch)
+            breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
   
         }
     }

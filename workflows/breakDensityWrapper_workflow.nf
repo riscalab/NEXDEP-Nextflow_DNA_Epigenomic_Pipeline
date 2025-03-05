@@ -78,13 +78,13 @@ workflow breakDensityWrapper_workflow {
     norm_break_files = mk_break_points.out.break_files
     // find a way to get all bams in one channel. probaly have to collect bams then collect index using multi map to have the same order
     // if using andrews scripts the break files still arent found so it still calculates its own.
-
+    //peak_files.collect().view()
 
     if (params.test) {
-        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.flatten().take(1)) // just for test, but i just want to take 1 peak file
+        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.take(1)) // just for test, but i just want to take 1 peak file
     }
     else {
-        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.flatten())
+        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.collect())
 
     }
 
