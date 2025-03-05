@@ -403,6 +403,7 @@ process samtools_sort {
     # for samtools sort
     # -o : takes a file. it writes the final sorted output to file rather than standard output
     # -O : write the final output as sam, bam, or cram
+    # -t : sort by tag, used RG for sorting by read group
 
     # samtools fixmate : preparing for finding the duplicates
     # -O : specify the format and i choose bam
@@ -447,7 +448,9 @@ process samtools_sort {
 
 
     # now i will coordinate sort here 
+    # will also add the read group sort
     samtools sort \
+    -t RG \
     -o "${out_bam_coor_sort}" \
     -O bam \
     "${out_bam_fixmate}"
@@ -681,7 +684,8 @@ process bedtools_filt_blacklist {
 }
 
 process samtools_bl_index {
-    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
     
 
@@ -727,6 +731,7 @@ process samtools_bl_index {
     # just do some sorting 
 
     samtools sort \
+    -t RG \
     -o "${out_bam_name_sort}" \
     -O bam \
     "${bl_filt_bam}"
@@ -957,14 +962,21 @@ process bwa_PE_aln {
     """
     #!/usr/bin/env bash
 
-    ######## bwa aln parameters / bwa sampe params #########
+    ######## bwa aln parameters  #########
     # -t : allows for the amout of threads you want this process to use
 
-    #
-
+    # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+    # but the above are for bam files
 
 
     #########################################################
+
+    ####### bwa sampe params ######################
+
+    # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+
+
+    ###############################################
 
 
     bwa aln \
@@ -1117,7 +1129,9 @@ process deeptools_aln_shift {
 
 
 process samtools_index_sort {
-    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
     //publishDir './blacklist_filt_bam/bl_filt_index', mode: 'copy', pattern:'*.bai'
     
@@ -1162,6 +1176,7 @@ process samtools_index_sort {
     # just do some sorting 
 
     samtools sort \
+    -t RG \
     -o "${out_bam_name_sort}" \
     -O bam \
     "${bam}"
@@ -1183,8 +1198,10 @@ process mk_break_points {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
 
-    publishDir "${params.base_out_dir}/break_point_bed", mode: 'copy', pattern: '*_breaks.bed'
+    publishDir "${params.base_out_dir}/break_point_bed", mode: 'copy', pattern: '*bed'
     //publishDir './results_PE/'
+    publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts", mode: 'copy', pattern: '*bampe.log'
+
 
     input:
     // take the bam files either bl filtered or not bl filtered from only the pair end path
@@ -1196,6 +1213,7 @@ process mk_break_points {
     output:
     path("*breaks.bed"), emit: break_files
     path("*breaks.sorted.bed"), emit: sorted_break_bed
+    path("*unmapped.bampe.log"), emit: unmapped_bampe_log
 
 
     script:
@@ -1203,6 +1221,13 @@ process mk_break_points {
     out_bampe_name = "${bams.baseName}.bampe.bed"
     break_point_name = "${bams.baseName}.breaks.bed"
     sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
+
+    // making a new file name for the filtered breaks.bed file removing the coordinates < 0
+
+    filt_break_point_name = "${bams.baseName}.bampe.filt.bed"
+
+    // making a log file that records how many read ends I removed that were unmapped
+    unmapped_bampe_log = "${bams.baseName}.unmapped.bampe.log"
 
     // making sure the bed file is sorted so just doing it again
     //sorted_bed_file = 
@@ -1218,18 +1243,31 @@ process mk_break_points {
     ###############################
 
     # this will create a bampe bed file so we can get the first field the second field and the sixth field
+    # can't use bedpe since these files are not sorted by RG and we cant since the fastq files dont have that information
+    # this breaks becasue when aligning to the MT genome some read ends are unmapped the chromosome and strand will be "." and the start and end coordinates will be set to -1 and sorting will not like this.
+    # I can fix this by removing those lines using awk
+    # if that doesnt work I can just not use bedpe option
 
     bedtools bamtobed \
     -bedpe \
     -i "${bams}" \
     > "${out_bampe_name}"
 
+    
+
     awk '{print \$1"\t"\$2"\t"\$2}' "${out_bampe_name}" > "${break_point_name}"
     awk '{print \$1"\t"\$6"\t"\$6}' "${out_bampe_name}" >> "${break_point_name}"
 
+    # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
+    awk '\$2>0 {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
+
+    echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
+
+     
+
     # sorting the break bed files now
     bedtools sort \
-    -i "${break_point_name}" \
+    -i "${filt_break_point_name}" \
     > "${sorted_break_point}"
 
 
@@ -1241,6 +1279,40 @@ process mk_break_points {
     #> "\${sorted_break_point}"
 
 
+
+
+    """
+}
+
+// I might not need this process since I can just use  the -t RG option in the other sort process and it will first sort by the tag then the coordinate. so thats what i want, for it to be coordinate sorted but also have some kind of tag sort
+process rg_sort {
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/sorted_bams/read_group_sorted"
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
+
+
+    input:
+
+    path(bam)
+
+
+    output:
+
+
+
+    script:
+
+
+    """
+    #!/usr/bin/env bash
+
+    ####### samtools sort ##########
+
+    # -t : this parameter 
+
+    ################################
 
 
     """
@@ -1298,7 +1370,7 @@ process breakDensityWrapper_process {
     
     echo "this is the bam file: "${bams}". And this is the index: "${index}" "
 
-    
+    # one way to do this is to copy the files that breakDensityWrapper.sh calls here to this directory. instead of going in to them and going back 3 directories.    
 
     breakDensityWrapper.sh "${bams}" "${peak_files}"
     

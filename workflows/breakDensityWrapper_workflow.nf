@@ -1,4 +1,5 @@
 
+// making a parameter to put all the break density files in the process maybe
 
 
 // note: this workflow is in the workflow dir so i need to go back one dir to get the modules dir
@@ -41,12 +42,12 @@ workflow breakDensityWrapper_workflow {
 
     // test putting all the bam index tuple in the process
 
-    //bam_index_tuple.collect().flatten().view()
+    // bam_index_tuple.collect().flatten().view()
     // bam_index_tuple
     //     .multiMap{
     //         file -> 
-    //         bams:  "${file[0].Parent}/${file[0].baseName}.sorted.bam" //filter(~/.*bam/) not sure why filter doesnt do what i wanted
-    //         index: "${file[1].Parent}/${file[1].baseName}.sorted.bam.bai" //filter(~/.*bai/)
+    //         bams: file(file[0]).renameTo("${file[0].Parent}/${file[0].baseName}.sorted.bam") // this doesnt rename the file it makes a new file name "${file[0].Parent}/${file[0].baseName}.sorted.bam" //filter(~/.*bam/) not sure why filter doesnt do what i wanted
+    //         index: file(file[1]).renameTo("${file[1].Parent}/${file[1].baseName}.sorted.bam") // this doesnt rename the file it makes a new file name "${file[1].Parent}/${file[1].baseName}.sorted.bam.bai" //filter(~/.*bai/)
     //     }
     //     .set{multi_bam_index_ch}
     // multi_bam_index_ch.bams.view{file -> "bams $file"}
@@ -65,7 +66,11 @@ workflow breakDensityWrapper_workflow {
     multi_bam_index_ch.bams.view{file -> "bams $file"}
     multi_bam_index_ch.index.view{file -> "index $file"}
     
-        
+    // downstream of this workflow I need to have a process that will sort the bam files by read group -t RG using samtools sort
+    // // I might not need this process since I can just use  the -t RG option in the other sort process and it will first sort by the tag then the coordinate. so thats what i want, for it to be coordinate sorted but also have some kind of tag sort
+    //rg_sort(multi_bam_index_ch.bams)
+
+
     // getting the break points sorted bed file first
     mk_break_points(multi_bam_index_ch.bams)
 
