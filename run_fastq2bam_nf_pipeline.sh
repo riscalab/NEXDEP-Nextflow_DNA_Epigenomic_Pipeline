@@ -3,6 +3,7 @@
 #SBATCH --mem=40GB
 #SBATCH --partition=hpc_a10_a
 #SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=rjohnson@rockefeller.edu
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=24:00:00
@@ -29,6 +30,10 @@ conda activate nextflow_three
 # --spike_in : lets the pipeline know it should run the workflow for spike ins
 # --t7, --lambda : choose one or both and the single end spike in workflow for these will be executed. Have to use with parameter --spike_in
 # --yeast : choose the yeast spike in if you have ricc_seq data or data that wants yeast spike in, and the single end spike end will run. must use with parameter --spike_in
+
+# --give_peak_files : this is a parameter for the nasa project. Put all peaks in a directory and give the glob pattern '*.narrowPeak' for the pipeline to find your narrow peak files and use them. give the absolute path followed by the glob pattern. if this is not specified then the pipeline will used the peak files that I choose from the data I have access to.
+
+
 ########################################
 
 ########### for PE data ##############
@@ -47,6 +52,9 @@ conda activate nextflow_three
 # --spike_in : lets the pipeline know it should run the workflow for spike ins
 # --t7, --lambda : choose one or both and the pair end spike in workflow for these will be executed. Have to use with parameter --spike_in
 # --yeast : choose the yeast spike in if you have ricc_seq data or data that wants yeast spike in, and the pair end spike end will run. must use with parameter --spike_in
+
+# --give_peak_files : this is a parameter for the nasa project. Put all peaks in a directory and give the glob pattern '*.narrowPeak' for the pipeline to find your narrow peak files and use them. give the absolute path followed by the glob pattern. if this is not specified then the pipeline will used the peak files that I choose from the data I have access to.
+
 ######################################
 
 # NOTE: path to the peak files /lustre/fs4/home/ascortea/store/ascortea/beds
@@ -70,7 +78,6 @@ conda activate nextflow_three
 
 nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 -resume \
---test \
 --PE \
 --BL \
 --paired_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*' \

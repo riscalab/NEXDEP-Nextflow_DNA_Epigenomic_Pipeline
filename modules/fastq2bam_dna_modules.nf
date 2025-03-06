@@ -1192,6 +1192,8 @@ process samtools_index_sort {
 
 
 process mk_break_points {
+
+    label 'normal_big_resources'
     // this is my attempt at creating the break density script, but i will try another process where I just call the break density wrapper.
 
     // all the wrapper does is make each peak file work with each bam file. so just make a process that takes the bam file and run all the break density scripts with each peak file. each bam will work with all the peak files in their own process instance.
@@ -1397,7 +1399,7 @@ process py_calc_stats_log {
 
     //shell '/bin/python3'
 
-    publishDir "${params.base_out_dir}/py_calc_stats_log", mode: 'copy', pattern: '*.tsv'
+    publishDir "${params.base_out_dir}/py_calc_stats_log", mode: 'copy', pattern: '*'
 
 
     input:
@@ -1407,6 +1409,8 @@ process py_calc_stats_log {
     output:
 
     path("bam_*.tsv"), emit: pe_tsv_log
+    path("*stats.txt")
+    path("*stats.html")
     
     
 
@@ -1478,8 +1482,30 @@ process py_calc_stats_log {
     # writing the tsv
     final_log_stats_df.to_csv("${log_file_out}", sep = '\t')
 
-    
+
+    # making a nice table
+
+    from tabulate import tabulate
+
+    data = pd.read_table("${log_file_out}", index_col=False, sep = '\t')
+    # remove that annoying first column that will be named 'Unnamed: 0'
+    data.pop('Unnamed: 0')
+
+    table_pipe = tabulate(data, headers = data.columns.to_list(), tablefmt = 'grid' )
+
+    table_html = tabulate(data, headers = data.columns.to_list(), tablefmt = 'html')
+
+    file_pipe = open('table_pipe_stats.txt', 'w')
+    file_pipe.write(table_pipe)
+    file_pipe.close()
+
+    file_html = open('table_bam_stats.html','w')
+    file_html.write(table_html)
+    file_html.close()
+
+
    
+
     
     """
 
