@@ -1,7 +1,7 @@
 
 process fastp_SE_adapter_known_spike_in {
 
-    label 'spike_in_small_resources'
+    label 'spike_in_big_resoruces'
 
     // using this conda yml file that I created. Nextflow will now make its own conda environment from the dependencies found within.
     //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastp_rj_env.yml'
@@ -88,7 +88,7 @@ process fastp_SE_adapter_known_spike_in {
 // This next process will run some qc to look at the fastq files and trim adapters from the single end reads
 process fastp_SE_spike_in {
 
-    label 'spike_in_small_resources'
+    label 'spike_in_big_resoruces'
 
     // using this conda yml file that I created. Nextflow will now make its own conda environment from the dependencies found within.
     //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastp_rj_env.yml'
@@ -376,7 +376,7 @@ process bwa_align_SE_spike_in {
 
 process samtools_sort_spike_in {
 
-    label 'spike_in_small_resources'
+    label 'spike_in_big_resoruces'
     // using the conda yml file for samtools
     // it doesnt work
     //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/samtools_rj_env.yml'
@@ -854,7 +854,7 @@ process samtools_bl_index_spike_in {
 
 process fastp_PE_spike_in {
 
-    label 'spike_in_small_resources'
+    label 'spike_in_big_resoruces'
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastp_rj'
 
@@ -1053,7 +1053,7 @@ process multiqc_PE_spike_in {
 
 process bwa_PE_aln_spike_in {
 
-    label 'spike_in_small_resources'
+    label 'spike_in_big_resoruces'
 
     conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
 
@@ -1197,6 +1197,8 @@ process multiqc_bam_stats_spike_in {
 // samtools_index_sort_spike_in copied from the original but adding a sub dir for gloe_seq, end_seq and ricc_seq
 
 process samtools_index_sort_spike_in {
+
+    label 'spike_in_big_resoruces'
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
 
     //publishDir './blacklist_filt_bam/bl_filt_index', mode: 'copy', pattern:'*.bai'

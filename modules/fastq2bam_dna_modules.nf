@@ -403,6 +403,7 @@ process samtools_sort {
     # for samtools sort
     # -o : takes a file. it writes the final sorted output to file rather than standard output
     # -O : write the final output as sam, bam, or cram
+    # -t : sort by tag, used RG for sorting by read group
 
     # samtools fixmate : preparing for finding the duplicates
     # -O : specify the format and i choose bam
@@ -447,7 +448,9 @@ process samtools_sort {
 
 
     # now i will coordinate sort here 
+    # will also add the read group sort
     samtools sort \
+    -t RG \
     -o "${out_bam_coor_sort}" \
     -O bam \
     "${out_bam_fixmate}"
@@ -532,6 +535,14 @@ process bam_log_calc {
 
     # now only putting the stats into a tsv file
     less "${samtools_stats_log}" | grep ^SN | cut -f 2-3 >  "${tsv_file_with_stats}"
+
+    # now I want to add the option of finding the amound of reads mapped to the mitochondrial genome and append it to the file
+    # note if the user uses a genome that doesnt have chrMT or chrM or even the mitochondrial genome at all then this will give back a 0 reads mapped
+    # samtools view option -F 260 ignores all reads that are unmapped and are secondary or supplementary alignments
+    # you can also use samtools view -e 'rname=="chrMT"' bam_file | wc -l but this might include other things but i got the same numbers for the specific bam file i checked
+
+    echo -e "chrMT mapped reads:\t\$(samtools view -F 260  "${bam}"  chrMT |wc -l)" >> "${tsv_file_with_stats}"
+    echo -e "chrM mapped reads:\t\$(samtools view -F 260  "${bam}"  chrM |wc -l)" >> "${tsv_file_with_stats}"
 
 
 
@@ -673,7 +684,8 @@ process bedtools_filt_blacklist {
 }
 
 process samtools_bl_index {
-    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
     
 
@@ -719,6 +731,7 @@ process samtools_bl_index {
     # just do some sorting 
 
     samtools sort \
+    -t RG \
     -o "${out_bam_name_sort}" \
     -O bam \
     "${bl_filt_bam}"
@@ -949,14 +962,21 @@ process bwa_PE_aln {
     """
     #!/usr/bin/env bash
 
-    ######## bwa aln parameters / bwa sampe params #########
+    ######## bwa aln parameters  #########
     # -t : allows for the amout of threads you want this process to use
 
-    #
-
+    # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+    # but the above are for bam files
 
 
     #########################################################
+
+    ####### bwa sampe params ######################
+
+    # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+
+
+    ###############################################
 
 
     bwa aln \
@@ -1109,7 +1129,9 @@ process deeptools_aln_shift {
 
 
 process samtools_index_sort {
-    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
     //publishDir './blacklist_filt_bam/bl_filt_index', mode: 'copy', pattern:'*.bai'
     
@@ -1154,6 +1176,7 @@ process samtools_index_sort {
     # just do some sorting 
 
     samtools sort \
+    -t RG \
     -o "${out_bam_name_sort}" \
     -O bam \
     "${bam}"
@@ -1169,14 +1192,18 @@ process samtools_index_sort {
 
 
 process mk_break_points {
+
+    label 'normal_big_resources'
     // this is my attempt at creating the break density script, but i will try another process where I just call the break density wrapper.
 
     // all the wrapper does is make each peak file work with each bam file. so just make a process that takes the bam file and run all the break density scripts with each peak file. each bam will work with all the peak files in their own process instance.
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
 
-    publishDir "${params.base_out_dir}/break_point_bed", mode: 'copy', pattern: '*_breaks.bed'
+    publishDir "${params.base_out_dir}/break_point_bed", mode: 'copy', pattern: '*bed'
     //publishDir './results_PE/'
+    publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts", mode: 'copy', pattern: '*bampe.log'
+
 
     input:
     // take the bam files either bl filtered or not bl filtered from only the pair end path
@@ -1186,16 +1213,26 @@ process mk_break_points {
     //path(bed_peaks)
 
     output:
+    path("*breaks.bed"), emit: break_files
+    path("*breaks.sorted.bed"), emit: sorted_break_bed
+    path("*unmapped.bampe.log"), emit: unmapped_bampe_log
 
 
     script:
 
-    out_bampe_name = "${bams.baseName}_bampe.bed"
-    break_point_name = "${bams.baseName}_breaks.bed"
-    sorted_break_point = "${bams.baseName}_sorted.bed"
+    out_bampe_name = "${bams.baseName}.bampe.bed"
+    break_point_name = "${bams.baseName}.breaks.bed"
+    sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
+
+    // making a new file name for the filtered breaks.bed file removing the coordinates < 0
+
+    filt_break_point_name = "${bams.baseName}.bampe.filt.bed"
+
+    // making a log file that records how many read ends I removed that were unmapped
+    unmapped_bampe_log = "${bams.baseName}.unmapped.bampe.log"
 
     // making sure the bed file is sorted so just doing it again
-    sorted_bed_file = 
+    //sorted_bed_file = 
 
     """
     #!/usr/bin/env bash
@@ -1208,29 +1245,76 @@ process mk_break_points {
     ###############################
 
     # this will create a bampe bed file so we can get the first field the second field and the sixth field
+    # can't use bedpe since these files are not sorted by RG and we cant since the fastq files dont have that information
+    # this breaks becasue when aligning to the MT genome some read ends are unmapped the chromosome and strand will be "." and the start and end coordinates will be set to -1 and sorting will not like this.
+    # I can fix this by removing those lines using awk
+    # if that doesnt work I can just not use bedpe option
 
     bedtools bamtobed \
     -bedpe \
     -i "${bams}" \
     > "${out_bampe_name}"
 
+    
+
     awk '{print \$1"\t"\$2"\t"\$2}' "${out_bampe_name}" > "${break_point_name}"
     awk '{print \$1"\t"\$6"\t"\$6}' "${out_bampe_name}" >> "${break_point_name}"
 
+    # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
+    awk '\$2>0 {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
+
+    echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
+
+     
+
     # sorting the break bed files now
     bedtools sort \
-    -i "${break_point_name}" \
+    -i "${filt_break_point_name}" \
     > "${sorted_break_point}"
 
 
     numBreaks=\$(wc -l "${break_point_name}")
 
 
-    bedtools sort \
-    -i "${bed}" \
-    > 
+    #bedtools sort \
+    #-i "\${bed}" \
+    #> "\${sorted_break_point}"
 
 
+
+
+    """
+}
+
+// I might not need this process since I can just use  the -t RG option in the other sort process and it will first sort by the tag then the coordinate. so thats what i want, for it to be coordinate sorted but also have some kind of tag sort
+process rg_sort {
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/sorted_bams/read_group_sorted"
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
+
+
+    input:
+
+    path(bam)
+
+
+    output:
+
+
+
+    script:
+
+
+    """
+    #!/usr/bin/env bash
+
+    ####### samtools sort ##########
+
+    # -t : this parameter 
+
+    ################################
 
 
     """
@@ -1241,6 +1325,10 @@ process mk_break_points {
 
 process breakDensityWrapper_process {
 
+    debug true
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
     publishDir "${params.base_out_dir}/break_density_calc", mode: 'copy', pattern: '*'
     
 
@@ -1248,7 +1336,12 @@ process breakDensityWrapper_process {
     // input has to be files that the breakDensityWrapper.sh script takes
     
     // it takes the bam files that have reads aligned to the reference genome. So I think it is best to collect all of the generated bams and ensure PLC is one of the bams.
-    path(bams)
+    path(bams) 
+    
+    path(index)
+
+    // now putting the sorted break files
+    path(sorted_breaks)
     
     // then it takes the peak files found in the directory  /lustre/fs4/home/ascortea/store/ascortea/beds
     path(peak_files)
@@ -1264,11 +1357,22 @@ process breakDensityWrapper_process {
 
     script:
 
+    //bam_with_sort_name = "${bams.baseName}.sorted.bam"
+    //index_with_sort_name = "${index.baseName}.sorted.bam.bai"
+
 
     """
     #!/usr/bin/env bash
 
     # nextflow can find stuff in the bin dir but not recursively, so i have to specify the sub dir
+
+    # see if i need to rename the index files here or if doing it in the nextflow portion works
+    
+    # also debug here
+    
+    echo "this is the bam file: "${bams}". And this is the index: "${index}" "
+
+    # one way to do this is to copy the files that breakDensityWrapper.sh calls here to this directory. instead of going in to them and going back 3 directories.    
 
     breakDensityWrapper.sh "${bams}" "${peak_files}"
     
@@ -1295,7 +1399,7 @@ process py_calc_stats_log {
 
     //shell '/bin/python3'
 
-    publishDir "${params.base_out_dir}/py_calc_stats_log", mode: 'copy', pattern: '*.tsv'
+    publishDir "${params.base_out_dir}/py_calc_stats_log", mode: 'copy', pattern: '*'
 
 
     input:
@@ -1305,6 +1409,8 @@ process py_calc_stats_log {
     output:
 
     path("bam_*.tsv"), emit: pe_tsv_log
+    path("*stats.txt")
+    path("*stats.html")
     
     
 
@@ -1355,13 +1461,17 @@ process py_calc_stats_log {
     # use this code below to see the column names to choose from
     # combined_stats_df.columns
 
-    final_log_stats_df = combined_stats_df.loc[:, ['sample_names','raw total sequences:','reads mapped:','reads mapped and paired:', 'reads duplicated:', 'reads MQ0:', 'percentage of properly paired reads (%):']]
+    final_log_stats_df = combined_stats_df.loc[:, ['sample_names','raw total sequences:','reads mapped:','reads mapped and paired:', 'reads duplicated:', 'reads MQ0:', 'percentage of properly paired reads (%):', 'chrMT mapped reads:', 'chrM mapped reads:']]
 
     # calculating the percentage of reads mapped, and adding it to a column called percent_reads_mapped
     final_log_stats_df['percent_reads_mapped'] = (final_log_stats_df.iloc[:,2]/final_log_stats_df.iloc[:,1])*100
 
     # calculating the percentage of reads duplicated and adding that as a column
     final_log_stats_df['percent_reads_duplicated'] = (final_log_stats_df.iloc[:,4]/final_log_stats_df.iloc[:,1])*100
+
+    # now calculating the percentage of reads mapped to chrMT and then to chrM
+    final_log_stats_df['percent_mapped_chrMT'] = (final_log_stats_df.iloc[:,7]/final_log_stats_df.iloc[:,1])*100
+    final_log_stats_df['percent_mapped_chrM'] = (final_log_stats_df.iloc[:,8]/final_log_stats_df.iloc[:,1])*100
 
 
     # right before I make the log file I want to clean up the column names and replace and spaces with an underscore
@@ -1372,8 +1482,30 @@ process py_calc_stats_log {
     # writing the tsv
     final_log_stats_df.to_csv("${log_file_out}", sep = '\t')
 
-    
+
+    # making a nice table
+
+    from tabulate import tabulate
+
+    data = pd.read_table("${log_file_out}", index_col=False, sep = '\t')
+    # remove that annoying first column that will be named 'Unnamed: 0'
+    data.pop('Unnamed: 0')
+
+    table_pipe = tabulate(data, headers = data.columns.to_list(), tablefmt = 'grid' )
+
+    table_html = tabulate(data, headers = data.columns.to_list(), tablefmt = 'html')
+
+    file_pipe = open('table_pipe_stats.txt', 'w')
+    file_pipe.write(table_pipe)
+    file_pipe.close()
+
+    file_html = open('table_bam_stats.html','w')
+    file_html.write(table_html)
+    file_html.close()
+
+
    
+
     
     """
 

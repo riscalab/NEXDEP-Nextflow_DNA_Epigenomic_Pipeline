@@ -71,13 +71,30 @@ workflow {
 
 
     // i will use a path already in the hpc as the defualt human genome but the user can change the genome by using -genome parameter and putting the path to a new genome in the command line when calling nextflow run
-    params.genome = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/genome/Sequence/Bowtie2Index/genome.fa')
+    // this hg19 genome that i wanted to use did not have mitochondrial chromosome.
+    //params.genome = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/genome/Sequence/Bowtie2Index/genome.fa')
+
+    // this genome version to use as default will have the mitochondrial genome and it was downloaded from ucsc.
+    // i will create a process that will download all of the needed genomes and give the user acces to choose which one through the use of parameters. At a later time
+    // I like it this way anyway, becasue the genome now has an actual name I can use if I need to reference it in the pipeline.
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT.fa')
+
+    // lets try this
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT_M_both.fa')
+
+    //next try this. it didnt work as the mitochondrial genome either
+    //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT_only2.fa')
+    
+    // trying the analysis set recommended by ucsc
+    params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/analysis_set_hg19/hg19.p13.plusMT.no_alt_analysis_set.fa')
 
     // this is the path to hg38 /rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa
     // putting the human genome in a channel
     // keeping the human genome in a value channel so i can have other processes run more than once.
     genome_ch = Channel.value(params.genome)
 
+    // hopefully uscs has a corresponding blacklist bed file I can use.
+    // this is the only one i see on ucsc. I dont think theres a specific version for hg19 with mitochondrial
     params.blacklist_path = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/blacklist/hg19-blacklist.v2.bed')
                 
     blacklist_ch = Channel.value(params.blacklist_path)
@@ -660,10 +677,45 @@ workflow {
 
 
     
-    // I want to have a parameter that takes peakfiles. The default will be the IMR90 narrowPeak files
-    params.peak_files = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
-    //now making the channel for the files
-    peak_files_ch = Channel.value(params.peak_files)
+    // // I want to have a parameter that takes peakfiles. The default will be the IMR90 narrowPeak files
+    // params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
+    // //now making the channel for the files
+    // peak_files_ch = Channel.fromPath(params.peak_files_IMR90)
+
+    // // now i need to make channels with other cell lines with the narrow peaks but also get the nulls. first other peaks
+    // peak_file_HUVEC = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/HUVEC/*.narrowPeak')
+    // peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.narrowPeak')
+    // peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*.narrowPeak')
+
+    // // wondering if i can do this
+    // all_peaks_ch = peak_files_ch.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
+
+    // some narrow peaks are under HUVEC/gkmsvm_null_regions/
+    // more narrow peaks are under IMR90/scrambles/ , but these ones are chunked bed files.
+
+    if (params.give_peak_files == null) {
+
+
+        // I want to have a parameter that takes peakfiles. The default will be the IMR90 narrowPeak files
+        params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
+        //now making the channel for the files
+        peak_files_ch = Channel.fromPath(params.peak_files_IMR90)
+
+        // now i need to make channels with other cell lines with the narrow peaks but also get the nulls. first other peaks
+        peak_file_HUVEC = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/HUVEC/*.narrowPeak')
+        peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.narrowPeak')
+        peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*.narrowPeak')
+
+        // wondering if i can do this
+        all_peaks_ch = peak_files_ch.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
+
+
+    }else {
+
+        params.give_peak_files = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
+
+        all_peaks_ch = Channel.fromPath(params.give_peak_files)
+    }
 
 
     if (params.calc_break_density){
@@ -671,13 +723,13 @@ workflow {
     
         if (params.PE) {
             
-            breakDensityWrapper_workflow(bam_index_tuple_ch, peak_files_ch)
+            breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
 
         }
 
         if (params.SE) {
          
-            breakDensityWrapper_workflow(bam_index_tuple_ch, peak_files_ch)
+            breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
   
         }
     }
