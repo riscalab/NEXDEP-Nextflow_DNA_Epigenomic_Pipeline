@@ -5,7 +5,8 @@
 // note: this workflow is in the workflow dir so i need to go back one dir to get the modules dir
 include {
     breakDensityWrapper_process;
-    mk_break_points
+    mk_break_points;
+    break_concat_results
 
 
 
@@ -84,8 +85,17 @@ workflow breakDensityWrapper_workflow {
         breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.take(1)) // just for test, but i just want to take 1 peak file
     }
     else {
-        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files.collect())
+        breakDensityWrapper_process(multi_bam_index_ch.bams.collect(),multi_bam_index_ch.index.collect(),norm_break_files.collect(), peak_files) // instead of collecting the peak files just have each process use all the bams and process on one peak file. then i can combine those output files
 
+        // make a channel to collect the breakDensityWrapper_process outputs
+        adj_enrich_tsv_files = breakDensityWrapper_process.out.adjusted_E_tsv
+        break_plot_pdfs = breakDensityWrapper_process.out.break_plot_pdf
+        density_calc_logs = breakDensityWrapper_process.out.density_calc_log
+
+        // now using the process to get all the files produced and concatnate them
+        // This process will concat the tsv files to each other and the log files to eachother
+
+        break_concat_results(adj_enrich_tsv_files.collect(), density_calc_logs.collect())
     }
 
 }

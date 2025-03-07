@@ -27,7 +27,7 @@ else
     bedtools bamtobed -bedpe -i ${bam##*/}.sorted.bam > ${bam##*/}.PE.bed
 	awk '{print $1"\t"$2"\t"$2}' ${bam##*/}.PE.bed > ${bam##*/}.breaks.no_filt.bed
 	awk '{print $1"\t"$6"\t"$6}' ${bam##*/}.PE.bed >> ${bam##*/}.breaks.no_filt.bed
-	awk '$2>0 {print $0}' ${bam##*/}.breaks.no_filt.bed  >> ${bam##*/}.breaks.bed
+	awk '$1 !="." {print $0}' ${bam##*/}.breaks.no_filt.bed  >> ${bam##*/}.breaks.bed
 	bedtools sort -i ${bam##*/}.breaks.bed > ${bam##*/}.breaks.sorted.bed
 fi
 #bedtools bamtobed -bedpe -i ${bam##*/}.sorted.bam > ${bam##*/}.PE.bed

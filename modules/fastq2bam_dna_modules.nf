@@ -1261,7 +1261,7 @@ process mk_break_points {
     awk '{print \$1"\t"\$6"\t"\$6}' "${out_bampe_name}" >> "${break_point_name}"
 
     # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
-    awk '\$2>0 {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
+    awk '\$1 !="." {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
 
     echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
 
@@ -1350,12 +1350,17 @@ process breakDensityWrapper_process {
     output:
 
     // output will be an AdjustedEnrichment.tsv
-    path("adjustedEnrichment.tsv"), emit: adjusted_E_tsv
+    path("adjustedEnrichment*.tsv"), emit: adjusted_E_tsv
     path("Adjusted_Enrichment_of_*_Plot.pdf"), emit: break_plot_pdf
-    path("densityCalculations.log"), emit: density_calc_log
+    path("densityCalculations*.log"), emit: density_calc_log
 
 
     script:
+
+    // if i get the peak file name, I can use the base name in the adjustment output file
+    unique_adj_enrich_file_name = "adjustedEnrichment_${peak_files}.tsv"
+    unique_adj_plot_name = "Adjusted_Enrichment_of_${peak_files}_Break_Density_Within_Peaks_Plot.pdf"
+    unique_density_calc_name = "densityCalculations_${peak_files}.log"
 
     //bam_with_sort_name = "${bams.baseName}.sorted.bam"
     //index_with_sort_name = "${index.baseName}.sorted.bam.bai"
@@ -1378,7 +1383,11 @@ process breakDensityWrapper_process {
     
     # this works but for some reason it is not seeing the output so it can be put in the published dir and also in the emit channels.
 
+    # now making unique files that represent the names of the peak files 
 
+    mv adjustedEnrichment.tsv "${unique_adj_enrich_file_name}" 
+    mv Adjusted_Enrichment_of_Break_Density_Within_Peaks_Plot.pdf "${unique_adj_plot_name}"
+    mv densityCalculations.log "${unique_density_calc_name}"
 
 
     """
@@ -1387,6 +1396,67 @@ process breakDensityWrapper_process {
 
 }
 
+// making a simple process that will take all of the tsv file and the log files and concatenate them
+
+process break_concat_results {
+
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/break_density_calc/complete_break_density_calc", mode: 'copy', pattern: '*'
+
+    // only using the conda for the second part
+    conda '/ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh'
+    
+    input:
+    path(adj_enrich_tsvs)
+
+    path(density_calc_logs)
+
+
+
+    output:
+
+    path("${adj_enrich_tsv_out}"), emit: complete_adj_enrichment
+
+    path("${density_calc_log_out}"), emit: complete_density_calc
+
+
+
+    script:
+
+    adj_enrich_tsv_out = "full_adj_enrichment.tsv"
+
+    density_calc_log_out = "full_density_calc.log"
+
+    """
+    #!/usr/bin/env bash
+
+    # I think I can separate one of the files to get the header
+
+    head -n 1 "${adj_enrich_tsvs[0]}" > "${adj_enrich_tsv_out}"
+    tail -n +2 "${adj_enrich_tsvs}" >> "${adj_enrich_tsv_out}"
+
+    # do the same for density calculations
+
+    head -n 1 "${density_calc_logs[0]}" > "${density_calc_log_out}"
+    tail -n +2 "${density_calc_logs}" >> "${density_calc_log_out}"
+
+
+    # I just need the full density calculations log and then I can make another full adj enrichment tsv and it will make the pdf plot
+    # i can compare my full adj enrichment tsv with the one created below using parts of andrews scripts.
+
+    conda activate rstudio
+    Rscript ../../../bin/calculateAdjustedEnrichmentV2.R full_density_calc.log
+    echo "All done!"
+
+
+
+
+
+
+    
+    """
+}
 
 
 process py_calc_stats_log {
