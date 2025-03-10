@@ -64,8 +64,8 @@ workflow breakDensityWrapper_workflow {
             index: file[1] //filter(~/.*bai/)
         }
         .set{multi_bam_index_ch}
-    multi_bam_index_ch.bams.view{file -> "bams $file"}
-    multi_bam_index_ch.index.view{file -> "index $file"}
+    //multi_bam_index_ch.bams.view{file -> "bams $file"}
+    //multi_bam_index_ch.index.view{file -> "index $file"}
     
     // downstream of this workflow I need to have a process that will sort the bam files by read group -t RG using samtools sort
     // // I might not need this process since I can just use  the -t RG option in the other sort process and it will first sort by the tag then the coordinate. so thats what i want, for it to be coordinate sorted but also have some kind of tag sort

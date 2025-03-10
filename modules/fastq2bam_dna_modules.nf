@@ -1325,7 +1325,7 @@ process rg_sort {
 
 process breakDensityWrapper_process {
 
-    debug true
+    //debug true
 
     conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
 
@@ -1405,7 +1405,9 @@ process break_concat_results {
     publishDir "${params.base_out_dir}/break_density_calc/complete_break_density_calc", mode: 'copy', pattern: '*'
 
     // only using the conda for the second part
-    conda '/ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh'
+    //conda '/ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh'
+
+    //conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
     
     input:
     path(adj_enrich_tsvs)
@@ -1434,17 +1436,18 @@ process break_concat_results {
     # I think I can separate one of the files to get the header
 
     head -n 1 "${adj_enrich_tsvs[0]}" > "${adj_enrich_tsv_out}"
-    tail -n +2 "${adj_enrich_tsvs}" >> "${adj_enrich_tsv_out}"
+    tail -n +2 ${adj_enrich_tsvs} >> "${adj_enrich_tsv_out}"
 
     # do the same for density calculations
 
     head -n 1 "${density_calc_logs[0]}" > "${density_calc_log_out}"
-    tail -n +2 "${density_calc_logs}" >> "${density_calc_log_out}"
+    tail -n +2 ${density_calc_logs} >> "${density_calc_log_out}"
 
 
     # I just need the full density calculations log and then I can make another full adj enrichment tsv and it will make the pdf plot
     # i can compare my full adj enrichment tsv with the one created below using parts of andrews scripts.
 
+    source /ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh
     conda activate rstudio
     Rscript ../../../bin/calculateAdjustedEnrichmentV2.R full_density_calc.log
     echo "All done!"
@@ -1581,3 +1584,116 @@ process py_calc_stats_log {
 
 }
 
+
+process overlap_window {
+
+    // this process might have 945 instances  17 bedfiles times the number of peakfiles
+
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/alignment_peak_overlap_qc", mode: 'copy', pattern:'*'
+
+    debug true
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
+
+    input:
+
+    // the order of the condition and everything else is 0GyP, PLC, 0GyC, Cells
+
+    tuple val(grouping_name), val(condition), val(basename), path(bedfiles), path(peakfile)
+
+    //path(peaks)
+
+    // path(zero_gy)
+
+    // path(plc)
+
+    // path(cells)
+
+    // path(all_peaks)
+
+
+
+    output:
+    path("${tsv_qc_file}"), emit: tsv_qc_files
+
+
+
+    script:
+
+    out_0GyP = "${basename[0]}_intersect_${peakfile}.bed"
+
+    out_0GyC = "${basename[2]}_intersect_${peakfile}.bed"
+
+    out_plc = "${basename[1]}_intersect_${peakfile}.bed"
+
+    out_cells = "${basename[3]}_intersect_${peakfile}.bed"
+
+    tsv_qc_file = "qc_${grouping_name}_overlap_${peakfile}.tsv"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # I need to only have the first 3 fields of both the peak files and the bed files
+    # using -i inplace with awk only works if you have gawk version, and this hpc does so I am fine with editing the file without changing the name.
+
+    # 0Gyp
+    awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${bedfiles[0]}  
+
+    # 0Gyc
+    awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${bedfiles[2]}
+
+    # plc 
+    awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${bedfiles[1]}
+
+    # cells
+    awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${bedfiles[3]}
+
+    # peakfile
+    awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${peakfile}
+
+    # first get all of the counts for reads the a bam file in each condition that intersect with the peaks in each peak files
+
+    # lets do debugging
+
+    echo "this is the 0GyP: ${bedfiles[0]}, the 0GyC: ${bedfiles[2]} this is plc: ${bedfiles[1]}, this is cells: ${bedfiles[3]}, and this is the peak file: ${peakfile}"
+
+    # now I just need to run bedtools on each of the 4 files in each process instance (17 total instances) but multiplied by now adding the peak files through the combine operator
+    
+    # first 0GyP
+    bedtools window -a ${peakfile} -b ${bedfiles[0]} -bed > ${out_0GyP} 
+
+    gyp_counts=\$(less ${out_0GyP} | wc -l)
+    total_gyp_counts=\$(less ${bedfiles[0]} | wc -l)
+
+    # second 0GyC
+    bedtools window -a ${peakfile} -b ${bedfiles[2]} -bed > ${out_0GyC}
+     
+    gyc_counts=\$(less ${out_0GyC} | wc -l)
+    total_gyc_counts=\$(less ${bedfiles[2]} | wc -l)
+
+    # third plc
+    bedtools window -a ${peakfile} -b ${bedfiles[1]} -bed > ${out_plc} 
+
+    plc_counts=\$(less ${out_plc} | wc -l)
+    total_plc_counts=\$(less ${bedfiles[1]} | wc -l)
+
+
+    # fourth cells
+    bedtools window -a ${peakfile} -b ${bedfiles[3]} -bed > ${out_cells} 
+
+    cells_counts=\$(less ${out_cells} | wc -l)
+    total_cell_counts=\$(less ${bedfiles[3]} | wc -l)
+
+    # now I need to get the word count of each of the conditions, that will represent how many reads are in a this instanced peak file for each condition
+
+    echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0Gyp\ttotal_0GyC\ttotal_PlC\ttotal_cells" > ${tsv_qc_file} # this is the header
+    echo -e "${grouping_name}\t${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}" >> ${tsv_qc_file} 
+
+
+
+
+    """
+}

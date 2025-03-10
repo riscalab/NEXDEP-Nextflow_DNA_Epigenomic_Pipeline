@@ -3,10 +3,9 @@
 #SBATCH --mem=40GB
 #SBATCH --partition=hpc_a10_a
 #SBATCH --mail-type=FAIL,END
-#SBATCH --mail-user=rjohnson@rockefeller.edu
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --job-name=nextflow_chip
 
 #source $HOME/.bashrc_rj_test.sh   # use this it works also but not for others

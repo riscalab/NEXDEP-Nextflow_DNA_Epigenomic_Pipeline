@@ -63,7 +63,11 @@ include {
             
 } from './workflows/2nd_spike_in_workflow.nf'
 
+include {
+    align_depth_in_peaks
 
+
+} from './workflows/align_depth_in_peaks.nf'
 
 workflow {
 
@@ -672,6 +676,7 @@ workflow {
     }
 
 
+
     // making a multiqc process for the samtools flagstat log files. this should be able to take the flagstat_log_ch from any part of the choosen paths
     //multiqc_bam_stats(flagstat_log_ch, norm_stats_txt_ch)
 
@@ -704,8 +709,8 @@ workflow {
         // now i need to make channels with other cell lines with the narrow peaks but also get the nulls. first other peaks
         peak_file_HUVEC = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/HUVEC/*.narrowPeak')
         peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.narrowPeak')
-        peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*.narrowPeak')
-
+        peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*minimal*.narrowPeak') // making sure to use only the minimal peaks.
+        //E055-DNase.macs2.narrowPeak causing problems
         // wondering if i can do this
         all_peaks_ch = peak_files_ch.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
 
@@ -733,6 +738,69 @@ workflow {
   
         }
     }
+
+
+    // first get a multi map of the different conditions (0gyr, PLC, 200(cells))
+
+    bed_files_norm_ch
+        .multiMap{file ->
+
+            zero_gy: file.name ==~ /.*0Gy.*\.bed/ ? file: null
+            PLC: file.name ==~ /.*PLC.*\.bed/ ? file: null
+            cells: file.name ==~ /.*Cells.*\.bed/ ? file: null
+        }
+        .set{cell_condition}
+    
+
+    // cell_condition.zero_gy.view{file -> "0gy: $file"}
+    // cell_condition.PLC.view{file -> "PLC: $file"}
+    // cell_condition.cells.view{file -> "cells: $file"}
+    //cell_condition.zero_gy.view()
+    // cell_condition.PLC.view()
+    // cell_condition.cells.view()
+
+    // filtering the null out of the channels
+
+    zero_gy_ch = cell_condition.zero_gy.filter{it != null}
+    plc_ch = cell_condition.PLC.filter{it != null}
+    cells_ch = cell_condition.cells.filter{it != null}
+
+
+    // try this
+
+    bed_files_norm_ch
+        .map { file -> tuple(file.baseName, file)}
+        .map { name, file -> 
+            tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
+            tuple(tokens, name, file)
+        }
+        .map {tokens, name, file ->
+        
+            ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+        
+        }
+        .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
+        .set { grouped_bed_ch}
+        //.view()
+        
+
+    // trying to cross the channels
+    // grouped_bed_ch.view()
+    // all_peaks_ch.view()
+    grouped_bed_ch.combine(all_peaks_ch).set{combined_bed_peak} // this has the grouped name, condition, basename, bed files, peak files. in that order
+
+    //combined_bed_peak.view()
+
+    
+
+    // all_peaks_ch.view()
+    //or make a tuple where all three conditions have the correct file
+
+    // I can make a workflow here that gets the depth of reads found in the bed files based on how many reads are in the peak files
+
+    // THIS IS THE WORKFLOW
+    //align_depth_in_peaks(zero_gy_ch, plc_ch, cells_ch, all_peaks_ch.collect() )
+    align_depth_in_peaks(combined_bed_peak)
 
     // I want to make a log file with all the stats from using samtools stats on each bam file
 
