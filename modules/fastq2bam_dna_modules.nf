@@ -1589,11 +1589,11 @@ process overlap_window {
 
     // this process might have 945 instances  17 bedfiles times the number of peakfiles
 
-    label 'normal_small_resources'
+    label 'super_small_resources'
 
-    publishDir "${params.base_out_dir}/alignment_peak_overlap_qc", mode: 'copy', pattern:'*'
+    //publishDir "${params.base_out_dir}/alignment_peak_overlap_qc", mode: 'copy', pattern:'*'
 
-    debug true
+    //debug true
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
 
@@ -1663,34 +1663,38 @@ process overlap_window {
     # now I just need to run bedtools on each of the 4 files in each process instance (17 total instances) but multiplied by now adding the peak files through the combine operator
     
     # first 0GyP
-    bedtools window -a ${peakfile} -b ${bedfiles[0]} -bed > ${out_0GyP} 
+    bedtools window -a ${peakfile} -b ${bedfiles[0]} -w 150 -bed > ${out_0GyP} 
 
     gyp_counts=\$(less ${out_0GyP} | wc -l)
     total_gyp_counts=\$(less ${bedfiles[0]} | wc -l)
+    percent_gyp=\$(awk "BEGIN {print (\$gyp_counts/(\$total_gyp_counts+1))*100}" )
 
     # second 0GyC
-    bedtools window -a ${peakfile} -b ${bedfiles[2]} -bed > ${out_0GyC}
+    bedtools window -a ${peakfile} -b ${bedfiles[2]} -w 150 -bed > ${out_0GyC}
      
     gyc_counts=\$(less ${out_0GyC} | wc -l)
     total_gyc_counts=\$(less ${bedfiles[2]} | wc -l)
+    percent_gyc=\$(awk "BEGIN {print (\$gyc_counts/(\$total_gyc_counts+1))*100}" )
 
     # third plc
-    bedtools window -a ${peakfile} -b ${bedfiles[1]} -bed > ${out_plc} 
+    bedtools window -a ${peakfile} -b ${bedfiles[1]} -w 150 -bed > ${out_plc} 
 
     plc_counts=\$(less ${out_plc} | wc -l)
     total_plc_counts=\$(less ${bedfiles[1]} | wc -l)
+    percent_plc=\$(awk "BEGIN {print (\$plc_counts/(\$total_plc_counts+1))*100}" )
 
 
     # fourth cells
-    bedtools window -a ${peakfile} -b ${bedfiles[3]} -bed > ${out_cells} 
+    bedtools window -a ${peakfile} -b ${bedfiles[3]} -w 150 -bed > ${out_cells} 
 
     cells_counts=\$(less ${out_cells} | wc -l)
     total_cell_counts=\$(less ${bedfiles[3]} | wc -l)
+    percent_cell=\$(awk "BEGIN {print (\$cells_counts/(\$total_cell_counts+1))*100}" )
 
     # now I need to get the word count of each of the conditions, that will represent how many reads are in a this instanced peak file for each condition
 
-    echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0Gyp\ttotal_0GyC\ttotal_PlC\ttotal_cells" > ${tsv_qc_file} # this is the header
-    echo -e "${grouping_name}\t${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}" >> ${tsv_qc_file} 
+    echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0GyP\ttotal_0GyC\ttotal_PlC\ttotal_cells\tpercent_GyP\tpercent_GyC\tpercent_PLC\tpercent_cells" > ${tsv_qc_file} # this is the header
+    echo -e "${grouping_name}\t${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}\t\${percent_gyp}\t\${percent_gyc}\t\${percent_plc}\t\${percent_cell}" >> ${tsv_qc_file} 
 
 
 

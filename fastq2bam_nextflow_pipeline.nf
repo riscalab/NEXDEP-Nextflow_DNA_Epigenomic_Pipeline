@@ -64,10 +64,15 @@ include {
 } from './workflows/2nd_spike_in_workflow.nf'
 
 include {
-    align_depth_in_peaks
+    align_depth_in_peaks_workflow
+
+} from './workflows/align_depth_in_peaks_workflow.nf'
 
 
-} from './workflows/align_depth_in_peaks.nf'
+include {
+    align_depth_in_peaks_spike_in_workflow
+}from './workflows/align_depth_in_peaks_spike_in_workflow.nf'
+
 
 workflow {
 
@@ -722,86 +727,77 @@ workflow {
         all_peaks_ch = Channel.fromPath(params.give_peak_files)
     }
 
-
-    if (params.calc_break_density){
-    // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
+    // putting this lower since I need to use the bam_index that has all the files including the spike-ins
+    // if (params.calc_break_density){
+    // // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
     
-        if (params.PE) {
+    //     if (params.PE) {
             
-            breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
+    //         breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
 
-        }
+    //     }
 
-        if (params.SE) {
+    //     if (params.SE) {
          
-            breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
+    //         breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
   
-        }
-    }
+    //     }
+    // }
 
 
     // first get a multi map of the different conditions (0gyr, PLC, 200(cells))
 
-    bed_files_norm_ch
-        .multiMap{file ->
+    // bed_files_norm_ch
+    //     .multiMap{file ->
 
-            zero_gy: file.name ==~ /.*0Gy.*\.bed/ ? file: null
-            PLC: file.name ==~ /.*PLC.*\.bed/ ? file: null
-            cells: file.name ==~ /.*Cells.*\.bed/ ? file: null
-        }
-        .set{cell_condition}
+    //         zero_gy: file.name ==~ /.*0Gy.*\.bed/ ? file: null
+    //         PLC: file.name ==~ /.*PLC.*\.bed/ ? file: null
+    //         cells: file.name ==~ /.*Cells.*\.bed/ ? file: null
+    //     }
+    //     .set{cell_condition}
     
 
-    // cell_condition.zero_gy.view{file -> "0gy: $file"}
-    // cell_condition.PLC.view{file -> "PLC: $file"}
-    // cell_condition.cells.view{file -> "cells: $file"}
-    //cell_condition.zero_gy.view()
-    // cell_condition.PLC.view()
-    // cell_condition.cells.view()
+    // // cell_condition.zero_gy.view{file -> "0gy: $file"}
+    // // cell_condition.PLC.view{file -> "PLC: $file"}
+    // // cell_condition.cells.view{file -> "cells: $file"}
+    // //cell_condition.zero_gy.view()
+    // // cell_condition.PLC.view()
+    // // cell_condition.cells.view()
 
-    // filtering the null out of the channels
+    // // filtering the null out of the channels
 
-    zero_gy_ch = cell_condition.zero_gy.filter{it != null}
-    plc_ch = cell_condition.PLC.filter{it != null}
-    cells_ch = cell_condition.cells.filter{it != null}
+    // zero_gy_ch = cell_condition.zero_gy.filter{it != null}
+    // plc_ch = cell_condition.PLC.filter{it != null}
+    // cells_ch = cell_condition.cells.filter{it != null}
 
 
     // try this
+    // if (params.depth_intersection){
 
-    bed_files_norm_ch
-        .map { file -> tuple(file.baseName, file)}
-        .map { name, file -> 
-            tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
-            tuple(tokens, name, file)
-        }
-        .map {tokens, name, file ->
-        
-            ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
-        
-        }
-        .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
-        .set { grouped_bed_ch}
-        //.view()
-        
+    //     bed_files_norm_ch
+    //         .map { file -> tuple(file.baseName, file)}
+    //         .map { name, file -> 
+    //             tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
+    //             tuple(tokens, name, file)
+    //         }
+    //         .map {tokens, name, file ->
+            
+    //             ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+            
+    //         }
+    //         .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
+    //         .set { grouped_bed_ch}
+    //         //.view()
+            
 
-    // trying to cross the channels
-    // grouped_bed_ch.view()
-    // all_peaks_ch.view()
-    grouped_bed_ch.combine(all_peaks_ch).set{combined_bed_peak} // this has the grouped name, condition, basename, bed files, peak files. in that order
+    //     // trying to cross the channels
+    //     // grouped_bed_ch.view()
+    //     // all_peaks_ch.view()
+    //     grouped_bed_ch.combine(all_peaks_ch).set{combined_bed_peak} // this has the grouped name, condition, basename, bed files, peak files. in that order
 
-    //combined_bed_peak.view()
+    //     align_depth_in_peaks(combined_bed_peak)
 
-    
-
-    // all_peaks_ch.view()
-    //or make a tuple where all three conditions have the correct file
-
-    // I can make a workflow here that gets the depth of reads found in the bed files based on how many reads are in the peak files
-
-    // THIS IS THE WORKFLOW
-    //align_depth_in_peaks(zero_gy_ch, plc_ch, cells_ch, all_peaks_ch.collect() )
-    align_depth_in_peaks(combined_bed_peak)
-
+    // }
     // I want to make a log file with all the stats from using samtools stats on each bam file
 
     //tsv_SN_stats_ch.view{"These are the tsv files $it"}
@@ -895,9 +891,9 @@ workflow {
 
         // first just initilize the channels to empty channels if their parameters were not set
         // doing this works
-        if (!params.t7) { pe_t7_bam_index_tuple_ch = Channel.empty()}
-        if (!params.lambda) { pe_lambda_bam_index_tuple_ch = Channel.empty()}
-        if (!params.yeast) { pe_yeast_bam_index_tuple_ch = Channel.empty()}
+        if (!params.t7) { pe_t7_bam_index_tuple_ch = Channel.empty(); pe_t7_bed_files = Channel.empty() }
+        if (!params.lambda) { pe_lambda_bam_index_tuple_ch = Channel.empty(); pe_lambda_bed_files = Channel.empty() }
+        if (!params.yeast) { pe_yeast_bam_index_tuple_ch = Channel.empty(); pe_yeast_bed_files = Channel.empty() }
         
         all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(pe_t7_bam_index_tuple_ch,
                                                 pe_lambda_bam_index_tuple_ch, 
@@ -905,12 +901,18 @@ workflow {
         )
         
         //all_spike_bam_index_tuple_ch.view()
+
+        // now do the same for the bed files
+        only_spike_beds = pe_t7_bed_files.concat(pe_lambda_bed_files,
+                                            pe_yeast_bed_files
+            
+        )
     }else if (params.SE) {
 
         //doing the same for the single end path
-        if (!params.t7) { se_t7_bam_index_tuple_ch = Channel.empty()}
-        if (!params.lambda) { se_lambda_bam_index_tuple_ch = Channel.empty()}
-        if (!params.yeast) { se_yeast_bam_index_tuple_ch = Channel.empty()}
+        if (!params.t7) { se_t7_bam_index_tuple_ch = Channel.empty(); se_t7_bed_files = Channel.empty()}
+        if (!params.lambda) { se_lambda_bam_index_tuple_ch = Channel.empty(); se_lambda_bed_files = Channel.empty()}
+        if (!params.yeast) { se_yeast_bam_index_tuple_ch = Channel.empty(); se_yeast_bed_files = Channel.empty()}
 
         all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(
                                                 se_t7_bam_index_tuple_ch,
@@ -919,9 +921,105 @@ workflow {
         )
         
         //all_spike_bam_index_tuple_ch.view()
+
+        // now do the same for the bed files
+        only_spike_beds = se_t7_bed_files.concat(se_lambda_bed_files,
+                                                se_yeast_bed_files
+            
+        )
     }
 
-    
+    // now that i have the bed file channel that contains all the normal bed files and the bed files for the spike ins if they are specified, i want to put the workflow to get the depth from intersection here
+
+    if (params.depth_intersection){
+
+        bed_files_norm_ch
+            .map { file -> tuple(file.baseName, file)}
+            .map { name, file -> 
+                tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
+                tuple(tokens, name, file)
+            }
+            .map {tokens, name, file ->
+            
+                ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+            
+            }
+            .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
+            .set { grouped_bed_ch}
+            
+            //.view()
+            
+
+        // trying to cross the channels
+        // grouped_bed_ch.view()
+        // all_peaks_ch.view()
+        grouped_bed_ch.combine(all_peaks_ch).set{combined_bed_peak} // this has the grouped name, condition, basename, bed files, peak files. in that order
+
+        //combined_bed_peak.view()
+        align_depth_in_peaks_workflow(combined_bed_peak)
+
+        // here just say if spike_in has been specified i will do everything above but just with the spike ins only 
+
+        if (params.spike_in) {
+
+            // probably just start by combining the spike files with the peak files and work with it that way.
+
+            
+            only_spike_beds
+                .map{ bed -> tuple(bed.baseName, bed)}
+                .map{name, bed -> 
+                    tokens = name.tokenize("_")
+                    tuple(tokens, name, bed)
+
+                }
+                .map{tokens, name , bed ->
+
+                    ["${tokens[0]}_${tokens[1]}_${tokens[5]}", tokens[2], tokens[5], name, bed]
+
+                }
+                .groupTuple(by:0)
+                .combine(all_peaks_ch)
+                
+                
+                
+                
+                
+                .set{combined_bed_peak_base}
+
+            //combined_bed_peak_base.view()
+            align_depth_in_peaks_spike_in_workflow(combined_bed_peak_base)
+
+
+        }
+
+    }
+
+    // make it so that if the user specifies spike-ins then use the bam_index tuple with spike-ins, if not then only use the normal bam_index tuple
+
+    // fix this to params.spike_in later so i can get the full thing to run
+    if (params.spike_in_) {
+
+        if (params.calc_break_density){
+            // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
+            
+            breakDensityWrapper_workflow(all_spike_bam_index_tuple_ch, all_peaks_ch)
+
+        }
+
+
+    } else {
+
+        if (params.calc_break_density){
+                // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
+            
+                breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
+       
+        }
+
+
+    }
+
+
     // Now I want to take the bam_index_tuple or the atac_shift_bam_index_ch  and get the stats. percent mitochondrial alignment, number of reads, percent reads aligned
     // just take a few of the stats from the py_calc_sats_log
 

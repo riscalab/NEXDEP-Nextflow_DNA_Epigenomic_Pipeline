@@ -1,7 +1,6 @@
 #!/bin/env bash
 
-#SBATCH --mem=40GB
-#SBATCH --partition=hpc_a10_a
+#SBATCH --mem=20GB
 #SBATCH --mail-type=FAIL,END
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
@@ -31,6 +30,7 @@ conda activate nextflow_three
 # --yeast : choose the yeast spike in if you have ricc_seq data or data that wants yeast spike in, and the single end spike end will run. must use with parameter --spike_in
 
 # --give_peak_files : this is a parameter for the nasa project. Put all peaks in a directory and give the glob pattern '*.narrowPeak' for the pipeline to find your narrow peak files and use them. give the absolute path followed by the glob pattern. if this is not specified then the pipeline will used the peak files that I choose from the data I have access to.
+# --depth_intersection : this new parameter should be for anyone that has alignment bam files and want to check it's depth by seeing how many reads intersect with a given set of already created peak files
 
 
 ########################################
@@ -53,7 +53,7 @@ conda activate nextflow_three
 # --yeast : choose the yeast spike in if you have ricc_seq data or data that wants yeast spike in, and the pair end spike end will run. must use with parameter --spike_in
 
 # --give_peak_files : this is a parameter for the nasa project. Put all peaks in a directory and give the glob pattern '*.narrowPeak' for the pipeline to find your narrow peak files and use them. give the absolute path followed by the glob pattern. if this is not specified then the pipeline will used the peak files that I choose from the data I have access to.
-
+# --depth_intersection : this new parameter should be for anyone that has alignment bam files and want to check it's depth by seeing how many reads intersect with a given set of already created peak files
 ######################################
 
 # NOTE: path to the peak files /lustre/fs4/home/ascortea/store/ascortea/beds
@@ -85,7 +85,8 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 --calc_break_density \
 --spike_in \
 --t7 \
---lambda
+--lambda \
+--depth_intersection
 
 #--ATAC
 
