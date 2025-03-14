@@ -318,7 +318,7 @@ process bwa_align_SE_spike_in {
     
 
     input:
-    path(ref_genome)
+    // path(ref_genome)
     path(genome_index_files)
     path(fastq_filt_files)
     val(fastq_filt_names)
@@ -356,13 +356,13 @@ process bwa_align_SE_spike_in {
 
     bwa aln \
     -t 20 \
-    "${ref_genome}"  \
+    "${spike_genome}"  \
     "${fastq_filt_files}" \
     > "${sai_output_file}"
 
 
     bwa samse \
-    "${ref_genome}" \
+    "${spike_genome}" \
     "${sai_output_file}" \
     "${fastq_filt_files}" \
     > "${sam_name}"
@@ -1433,6 +1433,8 @@ process overlap_window_spike_in {
     output:
     path("${tsv_qc_file}"), emit: tsv_qc_files
 
+    
+
 
 
     script:
@@ -1514,6 +1516,239 @@ process overlap_window_spike_in {
 
 
 
+    """
+}
+
+
+process breakDensityWrapper_spike_in_process {
+
+    //debug true
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    publishDir "${params.base_out_dir}/break_density_calc/spike_in", mode: 'copy', pattern: '*'
+    
+
+    input:
+    // input has to be files that the breakDensityWrapper.sh script takes
+    
+    // it takes the bam files that have reads aligned to the reference genome. So I think it is best to collect all of the generated bams and ensure PLC is one of the bams.
+    path(bams) 
+    
+    path(index)
+
+    // now putting the sorted break files
+    path(sorted_breaks)
+    
+    // then it takes the peak files found in the directory  /lustre/fs4/home/ascortea/store/ascortea/beds
+    path(peak_files)
+
+
+    output:
+
+    // output will be an AdjustedEnrichment.tsv
+    path("adjustedEnrichment*.tsv"), emit: adjusted_E_tsv
+    path("Adjusted_Enrichment_of_*_Plot.pdf"), emit: break_plot_pdf
+    path("densityCalculations*.log"), emit: density_calc_log
+
+
+    script:
+
+    // if i get the peak file name, I can use the base name in the adjustment output file
+    unique_adj_enrich_file_name = "adjustedEnrichment_spike_in_${peak_files}.tsv"
+    unique_adj_plot_name = "Adjusted_Enrichment_of_${peak_files}_Break_Density_Within_Peaks_Plot.pdf"
+    unique_density_calc_name = "densityCalculations_spike_in_${peak_files}.log"
+
+    //bam_with_sort_name = "${bams.baseName}.sorted.bam"
+    //index_with_sort_name = "${index.baseName}.sorted.bam.bai"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # nextflow can find stuff in the bin dir but not recursively, so i have to specify the sub dir
+
+    # see if i need to rename the index files here or if doing it in the nextflow portion works
+    
+    # also debug here
+    
+    echo "this is the bam file: "${bams}". And this is the index: "${index}" "
+
+    # one way to do this is to copy the files that breakDensityWrapper.sh calls here to this directory. instead of going in to them and going back 3 directories.    
+
+    breakDensityWrapper.sh "${bams}" "${peak_files}"
+    
+    # this works but for some reason it is not seeing the output so it can be put in the published dir and also in the emit channels.
+
+    # now making unique files that represent the names of the peak files 
+
+    mv adjustedEnrichment.tsv "${unique_adj_enrich_file_name}" 
+    mv Adjusted_Enrichment_of_Break_Density_Within_Peaks_Plot.pdf "${unique_adj_plot_name}"
+    mv densityCalculations.log "${unique_density_calc_name}"
+
+
+    """
+
+
+
+}
+
+process mk_break_points_spike_in {
+
+    label 'normal_big_resources'
+    // this is my attempt at creating the break density script, but i will try another process where I just call the break density wrapper.
+
+    // all the wrapper does is make each peak file work with each bam file. so just make a process that takes the bam file and run all the break density scripts with each peak file. each bam will work with all the peak files in their own process instance.
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
+
+    publishDir "${params.base_out_dir}/break_point_bed/spike_in", mode: 'copy', pattern: '*bed'
+    //publishDir './results_PE/'
+    publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts/spike_in", mode: 'copy', pattern: '*bampe.log'
+
+
+    input:
+    // take the bam files either bl filtered or not bl filtered from only the pair end path
+    path(bams)
+    // i think i need to have a narrowpeak file or a bed file that has peak information as input also for the next part,
+    // have to call peaks and make a narrowpeak or bed peak file
+    //path(bed_peaks)
+
+    output:
+    path("*breaks.bed"), emit: break_files
+    path("*breaks.sorted.bed"), emit: sorted_break_bed
+    path("*unmapped.bampe.log"), emit: unmapped_bampe_log
+
+
+    script:
+
+    out_bampe_name = "${bams.baseName}.bampe.bed"
+    break_point_name = "${bams.baseName}.breaks.bed"
+    sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
+
+    // making a new file name for the filtered breaks.bed file removing the coordinates < 0
+
+    filt_break_point_name = "${bams.baseName}.bampe.filt.bed"
+
+    // making a log file that records how many read ends I removed that were unmapped
+    unmapped_bampe_log = "${bams.baseName}.unmapped.bampe.log"
+
+    // making sure the bed file is sorted so just doing it again
+    //sorted_bed_file = 
+
+    """
+    #!/usr/bin/env bash
+
+    #### parameters bedtools ######
+    # -bedpe : write bam alignments in bedpe format will have second field as start coordinates for forward read and 6th field as start coordinates for reverse reads
+    # -i : the input bam file
+
+
+    ###############################
+
+    # this will create a bampe bed file so we can get the first field the second field and the sixth field
+    # can't use bedpe since these files are not sorted by RG and we cant since the fastq files dont have that information
+    # this breaks becasue when aligning to the MT genome some read ends are unmapped the chromosome and strand will be "." and the start and end coordinates will be set to -1 and sorting will not like this.
+    # I can fix this by removing those lines using awk
+    # if that doesnt work I can just not use bedpe option
+
+    bedtools bamtobed \
+    -bedpe \
+    -i "${bams}" \
+    > "${out_bampe_name}"
+
+    
+
+    awk '{print \$1"\t"\$2"\t"\$2}' "${out_bampe_name}" > "${break_point_name}"
+    awk '{print \$1"\t"\$6"\t"\$6}' "${out_bampe_name}" >> "${break_point_name}"
+
+    # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
+    awk '\$1 !="." {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
+
+    echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
+
+     
+
+    # sorting the break bed files now
+    bedtools sort \
+    -i "${filt_break_point_name}" \
+    > "${sorted_break_point}"
+
+
+    numBreaks=\$(wc -l "${break_point_name}")
+
+
+    #bedtools sort \
+    #-i "\${bed}" \
+    #> "\${sorted_break_point}"
+
+
+
+
+    """
+}
+
+
+process break_concat_results_spike_in {
+
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/break_density_calc/complete_break_density_calc/spike_in", mode: 'copy', pattern: '*'
+
+    // only using the conda for the second part
+    //conda '/ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh'
+
+    //conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+    
+    input:
+    path(adj_enrich_tsvs)
+
+    path(density_calc_logs)
+
+
+
+    output:
+
+    path("${adj_enrich_tsv_out}"), emit: complete_adj_enrichment
+
+    path("${density_calc_log_out}"), emit: complete_density_calc
+
+
+
+    script:
+
+    adj_enrich_tsv_out = "spike_in_full_adj_enrichment.tsv"
+
+    density_calc_log_out = "spike_in_full_density_calc.log"
+
+    """
+    #!/usr/bin/env bash
+
+    # I think I can separate one of the files to get the header
+
+    head -n 1 "${adj_enrich_tsvs[0]}" > "${adj_enrich_tsv_out}"
+    tail -n +2 ${adj_enrich_tsvs} >> "${adj_enrich_tsv_out}"
+
+    # do the same for density calculations
+
+    head -n 1 "${density_calc_logs[0]}" > "${density_calc_log_out}"
+    tail -n +2 ${density_calc_logs} >> "${density_calc_log_out}"
+
+
+    # I just need the full density calculations log and then I can make another full adj enrichment tsv and it will make the pdf plot
+    # i can compare my full adj enrichment tsv with the one created below using parts of andrews scripts.
+
+    source /ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh
+    conda activate rstudio
+    Rscript ../../../bin/calculateAdjustedEnrichmentV2.R full_density_calc.log
+    echo "All done!"
+
+
+
+
+
+
+    
     """
 }
 

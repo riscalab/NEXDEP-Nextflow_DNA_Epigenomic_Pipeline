@@ -31,6 +31,7 @@ conda activate nextflow_three
 
 # --give_peak_files : this is a parameter for the nasa project. Put all peaks in a directory and give the glob pattern '*.narrowPeak' for the pipeline to find your narrow peak files and use them. give the absolute path followed by the glob pattern. if this is not specified then the pipeline will used the peak files that I choose from the data I have access to.
 # --depth_intersection : this new parameter should be for anyone that has alignment bam files and want to check it's depth by seeing how many reads intersect with a given set of already created peak files
+# --end_seq or --gloe_seq : the end_seq data and the gloe_seq data names are ordered differently have the user specify if end seq or gloe seq so i can use the correct order for geting name metadata
 
 
 ########################################
@@ -54,6 +55,8 @@ conda activate nextflow_three
 
 # --give_peak_files : this is a parameter for the nasa project. Put all peaks in a directory and give the glob pattern '*.narrowPeak' for the pipeline to find your narrow peak files and use them. give the absolute path followed by the glob pattern. if this is not specified then the pipeline will used the peak files that I choose from the data I have access to.
 # --depth_intersection : this new parameter should be for anyone that has alignment bam files and want to check it's depth by seeing how many reads intersect with a given set of already created peak files
+# --end_seq or --gloe_seq : the end_seq data and the gloe_seq data names are ordered differently have the user specify if end seq or gloe seq so i can use the correct order for geting name metadata
+
 ######################################
 
 # NOTE: path to the peak files /lustre/fs4/home/ascortea/store/ascortea/beds
@@ -62,15 +65,20 @@ conda activate nextflow_three
 # NEW NOTE: I want to add another process or workflow where i take all the bam_index_tuple_ch that made it to the end of the fastq to bam pipeline and send them to fastqc then multi-qc to get a good html file showing the stats.
 #          well neither fastqc nor multiqc takes bam files to be able to do this
 
-#nextflow run fastq2bam_nextflow_pipeline.nf -profile 'nasa_pipeline ' \
-#-resume \
-#--SE \
-#--single_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_ENDseq_Novaseq_010925/read1_fastqs/*_1.fastq.gz' \
-#--ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
-#--BL \
-#--spike_in \
-#--t7 \
-#--lambda
+# nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+# -resume \
+# --SE \
+# --single_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_ENDseq_Novaseq_010925/read1_fastqs/*_1.fastq.gz' \
+# --ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
+# --use_effectiveGenomeSize \
+# --num_effectiveGenomeSize '2864785220' \
+# --BL \
+# --spike_in \
+# --t7 \
+# --lambda \
+# --depth_intersection \
+# --end_seq \
+# --calc_break_density
 
 
 
@@ -82,14 +90,15 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 --paired_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*' \
 --use_effectiveGenomeSize \
 --num_effectiveGenomeSize '2864785220' \
---calc_break_density \
 --spike_in \
 --t7 \
 --lambda \
---depth_intersection
+--depth_intersection \
+--gloe_seq \
+--calc_break_density 
 
 #--ATAC
-
+#--calc_break_density \
  
 
  # NOTE: If you want to make your own nextflow diagram to see how the pipeline works run this command

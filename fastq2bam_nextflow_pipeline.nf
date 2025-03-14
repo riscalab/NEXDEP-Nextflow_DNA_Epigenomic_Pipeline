@@ -8,7 +8,9 @@ nextflow.enable.dsl=2
 params.base_out_dir = params.PE ? './results_PE' : (params.SE ? './results_SE' : '')
 // finally using modules
 
+params.pe_or_se_name = params.PE ? 'PE' : (params.SE ? 'SE' : '')
 
+params.expr_type = params.gloe_seq ? 'gloeseq_data': (params.end_seq ? 'endseq_data': '')
 
 include {
     fastp_SE_adapter_known;
@@ -32,6 +34,7 @@ include {
     mk_break_points;
     breakDensityWrapper_process;
     py_calc_stats_log;
+    tally_break_density
 
 
 
@@ -47,7 +50,12 @@ include {
 
 // i want to include another workflow script
 
-include {breakDensityWrapper_workflow} from './workflows/breakDensityWrapper_workflow.nf'
+include {
+    breakDensityWrapper_workflow;
+    breakDensityWrapper_spike_in_workflow
+
+
+} from './workflows/breakDensityWrapper_workflow.nf'
 
 //include {py_calc_stats_log} from './modules/fastq2bam_dna_modules.nf'
 
@@ -72,6 +80,15 @@ include {
 include {
     align_depth_in_peaks_spike_in_workflow
 }from './workflows/align_depth_in_peaks_spike_in_workflow.nf'
+
+
+include {
+
+    down_stream_workflow
+
+}from './workflows/downstream_analysis_workflows.nf'
+
+
 
 
 workflow {
@@ -914,10 +931,13 @@ workflow {
         if (!params.lambda) { se_lambda_bam_index_tuple_ch = Channel.empty(); se_lambda_bed_files = Channel.empty()}
         if (!params.yeast) { se_yeast_bam_index_tuple_ch = Channel.empty(); se_yeast_bed_files = Channel.empty()}
 
-        all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(
-                                                se_t7_bam_index_tuple_ch,
+        only_spike_bam_index_tuple_ch = se_t7_bam_index_tuple_ch.concat(
                                                 se_lambda_bam_index_tuple_ch,
                                                 se_yeast_bam_index_tuple_ch
+        )
+
+        all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(
+                                                only_spike_bam_index_tuple_ch
         )
         
         //all_spike_bam_index_tuple_ch.view()
@@ -933,19 +953,65 @@ workflow {
 
     if (params.depth_intersection){
 
+        // bed_files_norm_ch
+        //     .map { file -> tuple(file.baseName, file)}
+        //     .map { name, file -> 
+        //         tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
+        //         tuple(tokens, name, file)
+        //     }
+        //     .map {tokens, name, file ->
+            
+        //         ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+            
+        //     }
+        //     .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
+        //     .set { grouped_bed_ch}
         bed_files_norm_ch
-            .map { file -> tuple(file.baseName, file)}
-            .map { name, file -> 
-                tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
-                tuple(tokens, name, file)
-            }
-            .map {tokens, name, file ->
+            .collect()
+            .flatten()
+            .filter{ file -> !file.name.startsWith('Undetermined')}
+            .set{bed_files_norm_ch}
+       //bed_files_norm_ch.view()
+       
+       if (params.gloe_seq){
+
+            // in gloe_seq the naming is I_GB2_0GyC_T1_S00
             
-                ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
-            
-            }
-            .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
-            .set { grouped_bed_ch}
+            bed_files_norm_ch
+                        .map { file -> tuple(file.baseName, file.name, file)}
+                        .map { basename, filename, file -> 
+                            tokens = basename.tokenize("_") // there are 16 fields in the tokens now. I want the 2nd field 0Gy, cells, plc
+                            tuple(tokens, basename, filename, file)
+                        }
+                        .map {tokens, basename, filename, file ->
+                        
+                            ["${tokens[0]}_${tokens[1]}",tokens[2], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                        
+                        }
+                        .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.
+                        .set { grouped_bed_ch}
+        }
+        if (params.end_seq){
+
+            // in end_seq the field name order is K_0C1_T1_HBR2_S00_1_.....
+
+            bed_files_norm_ch
+                        .map { file -> tuple(file.baseName, file.name, file)}
+                        .map { basename, filename, file -> 
+                            tokens = basename.tokenize("_") // there are 16 fields in the tokens now. I want the 2nd field 0Gy, cells, plc
+                            tuple(tokens, basename, filename, file)
+                        }
+                        .map {tokens, basename, filename, file ->
+                        
+                            ["${tokens[0]}_${tokens[3]}",tokens[1], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                        
+                        }
+                        .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.
+                        .set { grouped_bed_ch}
+
+
+
+        }
             
             //.view()
             
@@ -963,7 +1029,8 @@ workflow {
         if (params.spike_in) {
 
             // probably just start by combining the spike files with the peak files and work with it that way.
-
+            // NOTE: i need to do the if gloe and if end seq stuff here also in the spike and organize the tokens and stuff
+            // then also make sure the align_depth_in_peaks_spike_in_workflow is the same as the original. same for the process if i made a spike in process for the workflow.
             
             only_spike_beds
                 .map{ bed -> tuple(bed.baseName, bed)}
@@ -994,30 +1061,41 @@ workflow {
 
     }
 
-    // make it so that if the user specifies spike-ins then use the bam_index tuple with spike-ins, if not then only use the normal bam_index tuple
+    // make it so that if the user specifies spike-ins then use only spike-ins to make it faster and have them in separate file, if not then only use the normal bam_index tuple
 
+    if (params.calc_break_density){
+
+        // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
+    
+        breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
+       
+    }
+    
+    
     // fix this to params.spike_in later so i can get the full thing to run
-    if (params.spike_in_) {
+    /*
+    if (params.spike_in) {
 
         if (params.calc_break_density){
             // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
             
-            breakDensityWrapper_workflow(all_spike_bam_index_tuple_ch, all_peaks_ch)
+            breakDensityWrapper_spike_in_workflow(only_spike_bam_index_tuple_ch, all_peaks_ch)
+                
+                
+            // breakDensityWrapper_workflow.out.complete_adj_enrich_ch
+            //     .map{output -> output.replace('full_adj_enrichment.tsv', 'spike_in_full_adj_enrichment.tsv')}
+            //     .set{spike_in_enrich_tsv}
+
+
+            // complete_density_calc_ch
+            //     .map{output -> output.replace('full_density_calc.log', 'spike_in_full_density_calc.log')}
+            //     .set{spike_in_density_log}    
+                
 
         }
 
 
-    } else {
-
-        if (params.calc_break_density){
-                // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
-            
-                breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
-       
-        }
-
-
-    }
+    }*/
 
 
     // Now I want to take the bam_index_tuple or the atac_shift_bam_index_ch  and get the stats. percent mitochondrial alignment, number of reads, percent reads aligned
@@ -1052,4 +1130,99 @@ workflow {
         py_calc_stats_log(tsv_SN_stats_tuple_ch)
 
     }
+
+
+
+// now work on making a heatmap using bedtools or deeptools or R. will figure it out
+
+// if (params.gloe_seq){
+
+//             // in gloe_seq the naming is I_GB2_0GyC_T1_S00
+            
+//     bed_files_norm_ch
+//                 .map { file -> tuple(file.baseName, file.name, file)}
+//                 .map { basename, filename, file -> 
+//                     tokens = basename.tokenize("_") // there are 16 fields in the tokens now. I want the 2nd field 0Gy, cells, plc
+//                     tuple(tokens, basename, filename, file)
+//                 }
+//                 .map {tokens, basename, filename, file ->
+                
+//                     ["${tokens[0]}_${tokens[1]}",tokens[2], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                
+//                 }
+//                 .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.
+//                 .set { grouped_bed_ch}
+// }
+// if (params.end_seq){
+
+//     // in end_seq the field name order is K_0C1_T1_HBR2_S00_1_.....
+
+//     bed_files_norm_ch
+//                 .map { file -> tuple(file.baseName, file.name, file)}
+//                 .map { basename, filename, file -> 
+//                     tokens = basename.tokenize("_") // there are 16 fields in the tokens now. I want the 2nd field 0Gy, cells, plc
+//                     tuple(tokens, basename, filename, file)
+//                 }
+//                 .map {tokens, basename, filename, file ->
+                
+//                     ["${tokens[0]}_${tokens[3]}",tokens[1], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                
+//                 }
+//                 .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.
+//                 .set { grouped_bed_ch}
+
+
+
+// }
+
+
+
+// }
+// now get the grouped bed files and see if that works. 
+// might need to not use the groped version but keep the tuple to have the names metadata
+
+
+// bed_files_norm_ch
+//                 .map { file -> tuple(file.baseName, file)}
+//                 .map { name, file -> 
+//                     tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 2nd field 0Gy, cells, plc
+//                     tuple(tokens, name, file)
+//                 }
+//                 .map {tokens, name, file ->
+                
+//                     ["${tokens[0]}_${tokens[3]}",tokens[1], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                
+//                 }
+//                 //.groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
+//                 .set { bed_ch}
+
+
+
+bam_index_tuple_ch.collect()
+                .flatten()
+                .filter(~/.*bam/)
+                .set{bam_files_only}
+
+bam_index_tuple_ch.collect()
+                .flatten()
+                .filter(~/.*bai/)
+                .set{index_files_only}
+//bam_files_only.view()
+//down_stream_workflow(bam_files_only, index_files_only)
+
+
+// get the files from the new dir with the breaks in bed files
+// just doing this for testing and meeting
+// putting this in the breakdensitywrapper_workflow, my process that makes the breakpoints will give the break bed files. mk_break_points process
+// break_bed_files = Channel.fromPath('/lustre/fs4/home/rjohnson/pipelines/hera_pipeline/break_points_bed/*')
+// //break_bed_files.view()
+// tally_break_density(break_bed_files)
+
+// break_counts_chr_tsv_ch = tally_break_density.out.tsv_break_counts_files
+
+// break_counts_chr_tsv_ch
+//     .collectFile(name: 'complete_break_counts_chr.tsv', keepHeader:true, sort: true, storeDir:"break_points_bed/complete_break_counts_chr" )
+//     .set {complete_break_counts_chr_ch}
+
+
 }

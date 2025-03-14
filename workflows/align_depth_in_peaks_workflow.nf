@@ -32,6 +32,9 @@ workflow align_depth_in_peaks_workflow {
     // PLC.view{it -> "plc: $it"}
     // cells.view{it -> "cells: $it"}
     //overlap_window(zero_gy, plc, cells, all_peaks)
+
+    //combined_bed_peak.view()
+    
     
     if (params.test) {
 
@@ -61,8 +64,35 @@ workflow align_depth_in_peaks_workflow {
 
     // combined_depth_intersect_ch.view()
 
-    multi_intersect_tsv_ch
-        .collectFile(name: 'alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
+    if (params.gloe_seq){
+
+        multi_intersect_tsv_ch
+            .collectFile(name: 'gloe_seq_alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
+            .map{file ->
+                lines = file.text.readLines()
+                header = lines[0]
+                data = lines[1..-1]
+                .collect {it.split('\t')}
+                .sort{row -> row[1]}
+                .collect{it.join("\t")}
+                return ([header] + data).join("\n")
+            
+            
+            }
+            .subscribe { sorted_data ->
+            
+                file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/gloe_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
+                file_name.text = sorted_data
+            
+            
+            }
+            .set{spike_in_reads_in_peaks_depth_sorted_ch}
+    }
+
+    if (params.end_seq){
+
+        multi_intersect_tsv_ch
+        .collectFile(name: 'end_seq_alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
         .map{file ->
             lines = file.text.readLines()
             header = lines[0]
@@ -76,16 +106,18 @@ workflow align_depth_in_peaks_workflow {
         }
         .subscribe { sorted_data ->
         
-            file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/alignmentReads_in_peaks_depth_sorted2.tsv")
+            file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/end_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
             file_name.text = sorted_data
         
         
         }
         .set{spike_in_reads_in_peaks_depth_sorted_ch}
+    }
+
 
     // then I would have to make a process to do the calculation of percentages
     // awk 'NR>1 {print ($3/($7+1))*100}' alingmentReads_in_peaks_depth.tsv > percent_test.txt use someting like this but dont make a new file
-
+    
 
 
 
