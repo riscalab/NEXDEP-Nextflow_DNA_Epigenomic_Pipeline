@@ -1891,17 +1891,24 @@ process tally_break_density {
     """
     #!/usr/bin/env bash
 
+    # get total counts from the entire file and divide the counts found per chromosome by the total to get the normalized counts for the file
+
+    # this total will include the X and Y chr counts
+    total_counts=\$(less ${break_bed_file} | wc -l)
+
     # grep for only chr1 and count them in the file
 
     echo -e "sample_name\tchr_name\tbreak_counts" > ${out_tsv_chr_counts}
     for i in {1..22}; do
 
         counts=\$(less ${break_bed_file} | grep -P "^chr\${i}(?=\t)"| wc -l)
+
+        normalized_counts=\$(awk 'BEGIN {printf "%.3f", '"\$counts"'/'"\$total_counts"'}')
         
-        echo -e "${sample_name}\tchr\${i}\t\${counts}" >> ${out_tsv_chr_counts}
+        echo -e "${sample_name}\tchr\${i}\t\${normalized_counts}" >> ${out_tsv_chr_counts}
     done
    
-
+    
 
 
 
