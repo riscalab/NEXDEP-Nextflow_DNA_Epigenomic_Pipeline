@@ -1061,13 +1061,19 @@ workflow {
 
     }
 
+
+
+
+
     // make it so that if the user specifies spike-ins then use only spike-ins to make it faster and have them in separate file, if not then only use the normal bam_index tuple
 
     if (params.calc_break_density){
 
         // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
-    
-        breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
+        //breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
+        
+        // if i dont want to have separate spike in workflow just send the spike in bam index here also. then make both channels have a value either saying normal or spike in so i can put them in different directories
+        breakDensityWrapper_workflow(bam_index_tuple_ch, only_spike_bam_index_tuple_ch, all_peaks_ch)
        
     }
     

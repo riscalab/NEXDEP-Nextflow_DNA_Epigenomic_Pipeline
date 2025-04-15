@@ -1362,6 +1362,65 @@ process mk_break_points {
     }
 }
 
+
+process get_scaling_numerator {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/python_w_packages_rj'
+
+    label 'normal_small_resources'
+
+    input:
+    path(spike_break_files)
+
+
+    output:
+
+    stdout
+
+
+
+
+    script:
+
+    //max_spike_count = "max_count"
+
+
+    """
+    #!/usr/bin/env python
+
+    import pandas as pd
+    import glob
+
+    bed_files = glob.glob("./*bed")
+
+    counts = {}
+
+    for file in bed_files:
+        with open(file, "r") as f:
+            count = sum(1 for line in f if line.strip())
+        counts[file] = count
+
+    # this is then getting the file that has the max counts and also then getting the counts of that file from the counts dictionary
+    max_file = max(counts, key=counts.get)
+    max_count = counts[max_file]
+
+    print(max_count)
+
+    
+
+
+
+
+
+    """
+
+
+
+}
+
+
+
+
 // I might not need this process since I can just use  the -t RG option in the other sort process and it will first sort by the tag then the coordinate. so thats what i want, for it to be coordinate sorted but also have some kind of tag sort
 process rg_sort {
     label 'normal_small_resources'
@@ -1867,10 +1926,12 @@ process overlap_window {
 
 }
 
+
 process tally_break_density {
 
     //publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*bed'
 
+    label 'super_small_resources'
 
     input:
 
@@ -1916,11 +1977,78 @@ process tally_break_density {
     
 }
 
+
+
+process cell_plc_tally_break_density {
+
+    //publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*bed'
+
+    label 'super_small_resources'
+
+    input:
+
+    // the first condition (0) is cells and the second (1) is plc an thats the same for the names and paths
+    tuple val(grouping), val(conditions), val(basename), val(filename), path(filepath)
+
+
+    output:
+
+    path("${out_tsv_chr_counts}"), emit: tsv_break_counts_files
+
+
+    script:
+
+    out_tsv_chr_counts = "${grouping}_break_counts_cells_vs_plc_per_chr.tsv"
+    //sample_name = "${break_bed_file.baseName}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # get total counts from the entire file and divide the counts found per chromosome by the total to get the normalized counts for the file
+
+    # this total will include the X and Y chr counts
+    total_counts_cells=\$(less ${filename[0]} | wc -l) # this would be the total counts for the cells
+    total_counts_plc=\$(less ${filename[1]} | wc -l)  # this would be the total counts for the plc
+
+    # grep for only chr1 and count them in the file
+
+    echo -e "grouping_name\tchr_name\tbreak_counts_cells_vs_plc" > ${out_tsv_chr_counts}
+    for i in {1..22}; do
+
+        counts_cells=\$(less ${filename[0]} | grep -P "^chr\${i}(?=\t)"| wc -l)
+
+        normalized_counts_cells=\$(awk 'BEGIN {printf "%.3f", '"\$counts_cells"'/'"\$total_counts_cells"'}')
+
+        counts_plc=\$(less ${filename[1]} | grep -P "^chr\${i}(?=\t)"| wc -l)
+
+        normalized_counts_plc=\$(awk 'BEGIN {printf "%.3f", '"\$counts_plc"'/'"\$total_counts_plc"'}')
+
+        # now I will take the normalized counts for cells and divide them by the normalized counts of the plc
+        
+        counts_cells_vs_plc=\$(awk 'BEGIN {printf "%.3f", '"\$normalized_counts_cells"'/'"\$normalized_counts_plc"'}')
+
+        echo -e "${grouping}\tchr\${i}\t\${counts_cells_vs_plc}" >> ${out_tsv_chr_counts}
+    done
+   
+    
+
+
+
+    """
+    
+}
+
 process r_heatmap {
 
     label 'normal_small_resources'
 
-    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/R_lan_2_rj'
+    // using a different better conda env i created for R
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/R_lan_2_rj'
+
+    // this is the current R conda environment to use
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/new_r_lan_3_rj'
+
 
     publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*.png'
 
@@ -1950,18 +2078,19 @@ process r_heatmap {
     #data = read.csv("break_points_bed/complete_break_counts_chr/complete_break_counts_chr.tsv", sep= '\t', header = TRUE)
 
     data = read.csv("${break_counts_per_chr_tsv}", sep= '\t', header = TRUE)
+    names = names(data)
 
-    matrix_data = pivot_wider(data, id_cols = 'sample_name',  names_from = 'chr_name', values_from = 'break_counts', values_fill = 0)
+    matrix_data = pivot_wider(data, id_cols = names[1],  names_from = names[2], values_from = names[3], values_fill = 0)
 
     df = as.data.frame(matrix_data)
 
-    rownames(df) = df[,1]
+    rownames(df) = df[,1]   
 
     df = df[,-1]
 
     matrix = as.matrix(df)
 
-    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=4, fontsize_col=4, cluster_cols = TRUE, clustering_distance_rows = "euclidean",clustering_distance_cols = "euclidean")
+    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=4, fontsize_col=4, cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows = "correlation",clustering_distance_cols = "correlation")
 
 
 
