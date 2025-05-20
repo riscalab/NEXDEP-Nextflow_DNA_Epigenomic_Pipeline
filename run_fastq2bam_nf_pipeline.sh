@@ -6,6 +6,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --time=1-00:00:00
 #SBATCH --job-name=nextflow_chip
+#SBATCH --partition=hpc_a10_a
 
 #source $HOME/.bashrc_rj_test.sh   # use this it works also but not for others
 
@@ -65,20 +66,32 @@ conda activate nextflow_three
 # NEW NOTE: I want to add another process or workflow where i take all the bam_index_tuple_ch that made it to the end of the fastq to bam pipeline and send them to fastqc then multi-qc to get a good html file showing the stats.
 #          well neither fastqc nor multiqc takes bam files to be able to do this
 
+# nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+# -resume \
+# --SE \
+# --single_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_ENDseq_Novaseq_010925/read1_fastqs/*_1.fastq.gz' \
+# --ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
+# --use_effectiveGenomeSize \
+# --num_effectiveGenomeSize '2864785220' \
+# --BL \
+# --spike_in \
+# --t7 \
+# --lambda \
+# --depth_intersection \
+# --end_seq \
+# --calc_break_density
+
 nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 -resume \
+--bisulfate_methylation \
+--genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
 --SE \
---single_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_ENDseq_Novaseq_010925/read1_fastqs/*_1.fastq.gz' \
+--single_end_reads '/lustre/fs4/home/rjohnson/pipelines/peak_calling_analysis_pipeline/test_published_data/sra_data/CpG_methylation/control_CpG_r1.fastq.gz' \
 --ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
 --use_effectiveGenomeSize \
 --num_effectiveGenomeSize '2864785220' \
 --BL \
---spike_in \
---t7 \
---lambda \
---depth_intersection \
---end_seq \
---calc_break_density
+-with-report 'CpG_methylation_alignment_test.html'
 
 
 

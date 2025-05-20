@@ -187,9 +187,9 @@ process fastqc_SE {
 
 process multiqc_SE {
     // this yml file doesnt work
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
 
-    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
     
     publishDir "${params.base_out_dir}/multiQC_collection", mode: 'copy', pattern: '*.html'
 
@@ -221,6 +221,92 @@ process multiqc_SE {
 
 }
 
+process bwa_meth_se {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_meth_align_rj'
+
+    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/CpG_sam_data", mode: 'copy', pattern: '*.sam'
+
+    label 'normal_big_resources'
+
+
+    input:
+
+    path(ref_genome)
+
+    path(fastq_filt_files)
+
+    val(fastq_filt_names)
+
+
+
+
+
+    output:
+    path("*.sam"), emit: sam_se_files
+
+
+    script:
+
+    sam_name_out = "${fastq_filt_names}.sam"
+
+    """
+    #!/usr/bin/env bash
+
+    # this will create a ref_genome with c2t in the name followed by .fasta
+    # actually it looks like this genome.fa.bwameth.c2t
+    bwameth.py index "${ref_genome}"
+
+    bwameth.py --threads 20 \
+    --reference ${ref_genome} \
+    ${fastq_filt_files} \
+    > ${sam_name_out}
+
+
+
+    """
+}
+
+process bwa_meth_pe {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_meth_align_rj'
+
+    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/CpG_sam_data", mode: 'copy', pattern: '*.sam'
+
+    label 'normal_big_resources'
+
+
+    input:
+
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2)
+
+    path(ref_genome)
+
+
+    output:
+    path("*.sam"), emit: sam_pe_files
+
+
+    script:
+
+    sam_name_out = "${filt_fastq_name}_filt_r1_r2.sam"
+
+    """
+    #!/usr/bin/env bash
+
+    # this will create a ref_genome with c2t in the name followed by .fasta
+    # actually it looks like this genome.fa.bwameth.c2t
+    bwameth.py index "${ref_genome}"
+
+    bwameth.py --threads 20 \
+    --reference ${ref_genome} \
+    ${fastq_r1} ${fastq_r2} \
+    > ${sam_name_out}
+
+
+
+    """
+}
 
 // Creating two processes that will index the reference genome
 
@@ -887,7 +973,9 @@ process fastqc_PE {
 
 process multiqc_PE {
 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
 
     publishDir "${params.base_out_dir}/multiqc_PE_output", mode: 'copy', pattern: '*'
 
@@ -1005,9 +1093,9 @@ process bwa_PE_aln {
 
 process multiqc_bam_stats {
 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
 
-    
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
 
     publishDir "${params.base_out_dir}/flag_stat_log/complete_log", mode: 'copy', pattern: '*.html'
 
@@ -2090,7 +2178,7 @@ process r_heatmap {
 
     matrix = as.matrix(df)
 
-    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=4, fontsize_col=4, cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows = "correlation",clustering_distance_cols = "correlation")
+    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=4, fontsize_col=4, cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows = "correlation",clustering_distance_cols = "correlation", scale = "row")
 
 
 
