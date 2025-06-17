@@ -86,12 +86,12 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 --bisulfate_methylation \
 --genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
 --SE \
---single_end_reads '/lustre/fs4/home/rjohnson/pipelines/peak_calling_analysis_pipeline/test_published_data/sra_data/CpG_methylation/control_CpG_r1.fastq.gz' \
+--single_end_reads '/lustre/fs4/home/rjohnson/pipelines/peak_calling_analysis_pipeline/test_published_data/sra_data/CpG_methylation/control_CpG_r1r2r3.fastq.gz' \
 --ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
 --use_effectiveGenomeSize \
 --num_effectiveGenomeSize '2864785220' \
 --BL \
--with-report 'CpG_methylation_alignment_test.html'
+-with-report 'CpG_methylation_alignment_run_number_4.html'
 
 
 

@@ -36,7 +36,8 @@ include {
     py_calc_stats_log;
     tally_break_density;
     bwa_meth_se;
-    bwa_meth_pe
+    bwa_meth_pe;
+    find_methylation_stats_process
 
 
 
@@ -707,6 +708,21 @@ workflow {
 
 
 
+    }
+    if (params.bisulfate_methylation) {
+
+        // I need to add deeptools make bed process so it will make the bigwig and the 10 bin bedgraph
+
+        deeptools_make_bed(bam_index_tuple_ch)
+
+        //deeptools_make_bed.out.bed_files_normalized.view()
+
+        bed_files_norm_ch = deeptools_make_bed.out.bed_files_normalized
+
+        // I want to take the bam_index tuple channel if it is bisulfate_methylation data and use the methylDackel tool to get actual methylation status of CpG sites and Islands
+
+        // methyDackel takes the reference genome and the bam files that has the bisulfate information
+        find_methylation_stats_process(genome_ch, bam_index_tuple_ch)
     }
     else {
 
