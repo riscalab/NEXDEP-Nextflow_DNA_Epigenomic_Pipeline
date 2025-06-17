@@ -1,8 +1,8 @@
 # NEXDEP-Nextflow_DNA_Epigenomic_Pipeline
-Welcome to NEXDEP our Nextflow DNA Epigenomic Pipeline. You can take your DNA based reads from fastq files to bam files. This pipeline will also include processes and workflows for any DNA data that is created from ChIP-seq, Cut&Run, Cut&Tag, ATAC-seq and more assays that rely on some form of peak calling downstream. 
+Welcome to NEXDEP our Nextflow DNA Epigenomic Pipeline. You can take your DNA based reads from fastq files to bam files. This pipeline will also include processes and workflows for any DNA data that is created from ChIP-seq, Cut&Run, Cut&Tag, ATAC-seq, Bisulfate Methylation and more assays that rely on some form of DNA alignment. 
 
 
-##This is the pipeline so far, it will take your dna based reads and preprocess them from the fastq to bam level. The pipeline handles ATAC data and shifts the genomic coordinates in preprocessing. There are many parameters so read through them and choose the best one that works for your project. This pipeline so far includes workflows specific for hera's project with NASA data, so those parameters will only be used for that project. I will add workflows that will take the dna based bam files and call peaks and other normal downstream analysis methods for this type of data. MORE COMMING SOON
+### This is the pipeline so far, it will take your dna based reads and preprocess them from the fastq to bam level. The pipeline handles ATAC data and shifts the genomic coordinates in preprocessing. There are many parameters so read through them and choose the best one that works for your project. This pipeline so far includes workflows specific for hera's project with NASA data, so those parameters will only be used for that project. I will add workflows that will take the dna based bam files and call peaks and other normal downstream analysis methods for this type of data. MORE COMMING SOON
 
 # How to run the pipeline
 
@@ -51,6 +51,8 @@ The reason being i specified in fastp that we will look adapters for PE and just
 
 --ATAC : if you have atac-seq data, please specify this parameter
 
+--bisulfate_methylation : This parameter will let the pipeline know that you have a bisulfate experiment and fastq files that need to be processed/ aligned with that in mind. This parameter will also make deeptools use a bin size of 10 when creating bigwig and bedgraph files for visualization in IGV, the bedgraph file will also have the regions of zero coverage not reported for a cleaner view. This parameter will also make use of the tool MethylDackel to give back exact locations of the methylated Cytosines in a CpG context.
+
 --genome : give the path to the reference genome file you want to use. if you dont specify then the defualt hg19 genome will be used
 
 --PE : lets the pipeline know you have pair end data
@@ -89,6 +91,8 @@ The reason being i specified in fastp that we will look adapters for PE and just
 --test: parameter will make the pipeline only take 3 of your fastq files(or fastq pairs in pair end) in your directory of many fastq files. without this the pipeline will run and process all of your fastq files
 
 --ATAC : if you have atac-seq data, please specify this parameter
+
+--bisulfate_methylation : This parameter will let the pipeline know that you have a bisulfate experiment and fastq files that need to be processed/ aligned with that in mind. This parameter will also make deeptools use a bin size of 10 when creating bigwig and bedgraph files for visualization in IGV, the bedgraph file will also have the regions of zero coverage not reported for a cleaner view. This parameter will also make use of the tool MethylDackel to give back exact locations of the methylated Cytosines in a CpG context.
 
 --SE parameter for pair end reads
 when using SE do
