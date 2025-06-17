@@ -187,9 +187,9 @@ process fastqc_SE {
 
 process multiqc_SE {
     // this yml file doesnt work
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
 
-    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
     
     publishDir "${params.base_out_dir}/multiQC_collection", mode: 'copy', pattern: '*.html'
 
@@ -221,6 +221,92 @@ process multiqc_SE {
 
 }
 
+process bwa_meth_se {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_meth_align_rj'
+
+    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/CpG_sam_data", mode: 'copy', pattern: '*.sam'
+
+    label 'normal_big_resources'
+
+
+    input:
+
+    path(ref_genome)
+
+    path(fastq_filt_files)
+
+    val(fastq_filt_names)
+
+
+
+
+
+    output:
+    path("*.sam"), emit: sam_se_files
+
+
+    script:
+
+    sam_name_out = "${fastq_filt_names}.sam"
+
+    """
+    #!/usr/bin/env bash
+
+    # this will create a ref_genome with c2t in the name followed by .fasta
+    # actually it looks like this genome.fa.bwameth.c2t
+    bwameth.py index "${ref_genome}"
+
+    bwameth.py --threads 20 \
+    --reference ${ref_genome} \
+    ${fastq_filt_files} \
+    > ${sam_name_out}
+
+
+
+    """
+}
+
+process bwa_meth_pe {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_meth_align_rj'
+
+    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/CpG_sam_data", mode: 'copy', pattern: '*.sam'
+
+    label 'normal_big_resources'
+
+
+    input:
+
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2)
+
+    path(ref_genome)
+
+
+    output:
+    path("*.sam"), emit: sam_pe_files
+
+
+    script:
+
+    sam_name_out = "${filt_fastq_name}_filt_r1_r2.sam"
+
+    """
+    #!/usr/bin/env bash
+
+    # this will create a ref_genome with c2t in the name followed by .fasta
+    # actually it looks like this genome.fa.bwameth.c2t
+    bwameth.py index "${ref_genome}"
+
+    bwameth.py --threads 20 \
+    --reference ${ref_genome} \
+    ${fastq_r1} ${fastq_r2} \
+    > ${sam_name_out}
+
+
+
+    """
+}
 
 // Creating two processes that will index the reference genome
 
@@ -887,7 +973,9 @@ process fastqc_PE {
 
 process multiqc_PE {
 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
 
     publishDir "${params.base_out_dir}/multiqc_PE_output", mode: 'copy', pattern: '*'
 
@@ -1005,9 +1093,9 @@ process bwa_PE_aln {
 
 process multiqc_bam_stats {
 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'
 
-    
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/multiqc_rj'
 
     publishDir "${params.base_out_dir}/flag_stat_log/complete_log", mode: 'copy', pattern: '*.html'
 
@@ -1220,71 +1308,206 @@ process mk_break_points {
 
     script:
 
-    out_bampe_name = "${bams.baseName}.bampe.bed"
-    break_point_name = "${bams.baseName}.breaks.bed"
-    sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
+    if (params.PE) {
+        out_bampe_name = "${bams.baseName}.bampe.bed"
+        break_point_name = "${bams.baseName}.breaks.bed"
+        sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
 
-    // making a new file name for the filtered breaks.bed file removing the coordinates < 0
+        // making a new file name for the filtered breaks.bed file removing the coordinates < 0
 
-    filt_break_point_name = "${bams.baseName}.bampe.filt.bed"
+        filt_break_point_name = "${bams.baseName}.bampe.filt.bed"
 
-    // making a log file that records how many read ends I removed that were unmapped
-    unmapped_bampe_log = "${bams.baseName}.unmapped.bampe.log"
+        // making a log file that records how many read ends I removed that were unmapped
+        unmapped_bampe_log = "${bams.baseName}.unmapped.bampe.log"
 
-    // making sure the bed file is sorted so just doing it again
-    //sorted_bed_file = 
+        // making sure the bed file is sorted so just doing it again
+        //sorted_bed_file = 
+
+        """
+        #!/usr/bin/env bash
+
+        #### parameters bedtools ######
+        # -bedpe : write bam alignments in bedpe format will have second field as start coordinates for forward read and 6th field as start coordinates for reverse reads
+        # -i : the input bam file
+
+
+        ###############################
+
+        # this will create a bampe bed file so we can get the first field the second field and the sixth field
+        # can't use bedpe since these files are not sorted by RG and we cant since the fastq files dont have that information
+        # this breaks becasue when aligning to the MT genome some read ends are unmapped the chromosome and strand will be "." and the start and end coordinates will be set to -1 and sorting will not like this.
+        # I can fix this by removing those lines using awk
+        # if that doesnt work I can just not use bedpe option
+
+        bedtools bamtobed \
+        -bedpe \
+        -i "${bams}" \
+        > "${out_bampe_name}"
+
+        
+
+        awk '{print \$1"\t"\$2"\t"\$2}' "${out_bampe_name}" > "${break_point_name}"
+        awk '{print \$1"\t"\$6"\t"\$6}' "${out_bampe_name}" >> "${break_point_name}"
+
+        # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
+        awk '\$1 !="." {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
+
+        echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
+
+        
+
+        # sorting the break bed files now
+        bedtools sort \
+        -i "${filt_break_point_name}" \
+        > "${sorted_break_point}"
+
+
+        numBreaks=\$(wc -l "${break_point_name}")
+
+
+        #bedtools sort \
+        #-i "\${bed}" \
+        #> "\${sorted_break_point}"
+
+
+
+
+        """
+    } else if (params.SE) {
+        
+        // since this is single end, i cant use bampe in the bamtobed bedtool
+
+        out_bampe_name = "${bams.baseName}.bampe.bed"
+        break_point_name = "${bams.baseName}.breaks.bed"
+        sorted_break_point = "${bams.baseName}.breaks.sorted.bed"
+
+        // making a new file name for the filtered breaks.bed file removing the coordinates < 0
+
+        filt_break_point_name = "${bams.baseName}.bampe.filt.bed"
+
+        // making a log file that records how many read ends I removed that were unmapped
+        unmapped_bampe_log = "${bams.baseName}.unmapped.bampe.log"
+
+        // making sure the bed file is sorted so just doing it again
+        //sorted_bed_file = 
+
+        """
+        #!/usr/bin/env bash
+
+        #### parameters bedtools ######
+        # -bedpe : write bam alignments in bedpe format will have second field as start coordinates for forward read and 6th field as start coordinates for reverse reads
+        # -i : the input bam file
+
+
+        ###############################
+
+        # this will create a bampe bed file so we can get the first field the second field and the sixth field
+        # can't use bedpe since these files are not sorted by RG and we cant since the fastq files dont have that information
+        # this breaks becasue when aligning to the MT genome some read ends are unmapped the chromosome and strand will be "." and the start and end coordinates will be set to -1 and sorting will not like this.
+        # I can fix this by removing those lines using awk
+        # if that doesnt work I can just not use bedpe option
+
+        # not using bedpe since this process path is for single end reads
+
+        bedtools bamtobed \
+        -i "${bams}" \
+        > "${out_bampe_name}"
+
+        
+
+        awk '{print \$1"\t"\$2"\t"\$2}' "${out_bampe_name}" > "${break_point_name}"
+
+        #awk '{print \$1"\t"\$6"\t"\$6}' "\${out_bampe_name}" >> "\${break_point_name}"
+
+        # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
+        awk '\$1 !="." {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
+
+        echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
+
+        
+
+        # sorting the break bed files now
+        bedtools sort \
+        -i "${filt_break_point_name}" \
+        > "${sorted_break_point}"
+
+
+        numBreaks=\$(wc -l "${break_point_name}")
+
+
+        #bedtools sort \
+        #-i "\${bed}" \
+        #> "\${sorted_break_point}"
+
+
+
+
+        """
+
+
+
+
+    }
+}
+
+
+process get_scaling_numerator {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/python_w_packages_rj'
+
+    label 'normal_small_resources'
+
+    input:
+    path(spike_break_files)
+
+
+    output:
+
+    stdout
+
+
+
+
+    script:
+
+    //max_spike_count = "max_count"
+
 
     """
-    #!/usr/bin/env bash
+    #!/usr/bin/env python
 
-    #### parameters bedtools ######
-    # -bedpe : write bam alignments in bedpe format will have second field as start coordinates for forward read and 6th field as start coordinates for reverse reads
-    # -i : the input bam file
+    import pandas as pd
+    import glob
 
+    bed_files = glob.glob("./*bed")
 
-    ###############################
+    counts = {}
 
-    # this will create a bampe bed file so we can get the first field the second field and the sixth field
-    # can't use bedpe since these files are not sorted by RG and we cant since the fastq files dont have that information
-    # this breaks becasue when aligning to the MT genome some read ends are unmapped the chromosome and strand will be "." and the start and end coordinates will be set to -1 and sorting will not like this.
-    # I can fix this by removing those lines using awk
-    # if that doesnt work I can just not use bedpe option
+    for file in bed_files:
+        with open(file, "r") as f:
+            count = sum(1 for line in f if line.strip())
+        counts[file] = count
 
-    bedtools bamtobed \
-    -bedpe \
-    -i "${bams}" \
-    > "${out_bampe_name}"
+    # this is then getting the file that has the max counts and also then getting the counts of that file from the counts dictionary
+    max_file = max(counts, key=counts.get)
+    max_count = counts[max_file]
+
+    print(max_count)
 
     
 
-    awk '{print \$1"\t"\$2"\t"\$2}' "${out_bampe_name}" > "${break_point_name}"
-    awk '{print \$1"\t"\$6"\t"\$6}' "${out_bampe_name}" >> "${break_point_name}"
-
-    # this is saying if field 2 is greater then 0 print the entire line and append it to the new file
-    awk '\$2>0 {print \$0 }' "${break_point_name}" >> "${filt_break_point_name}"
-
-    echo -e "unmapped read ends in "${break_point_name}":\t\$(awk '\$2 < 0 {print \$0}' "${break_point_name}" | wc -l)" >> "${unmapped_bampe_log}"
-
-     
-
-    # sorting the break bed files now
-    bedtools sort \
-    -i "${filt_break_point_name}" \
-    > "${sorted_break_point}"
-
-
-    numBreaks=\$(wc -l "${break_point_name}")
-
-
-    #bedtools sort \
-    #-i "\${bed}" \
-    #> "\${sorted_break_point}"
 
 
 
 
     """
+
+
+
 }
+
+
+
 
 // I might not need this process since I can just use  the -t RG option in the other sort process and it will first sort by the tag then the coordinate. so thats what i want, for it to be coordinate sorted but also have some kind of tag sort
 process rg_sort {
@@ -1325,7 +1548,7 @@ process rg_sort {
 
 process breakDensityWrapper_process {
 
-    debug true
+    //debug true
 
     conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
 
@@ -1350,12 +1573,17 @@ process breakDensityWrapper_process {
     output:
 
     // output will be an AdjustedEnrichment.tsv
-    path("adjustedEnrichment.tsv"), emit: adjusted_E_tsv
-    path("Adjusted_Enrichment_of_*_Plot.pdf"), emit: break_plot_pdf
-    path("densityCalculations.log"), emit: density_calc_log
+    path("${unique_adj_enrich_file_name}"), emit: adjusted_E_tsv
+    //path("${unique_adj_plot_name}"), emit: break_plot_pdf
+    path("${unique_density_calc_name}"), emit: density_calc_log
 
 
     script:
+
+    // if i get the peak file name, I can use the base name in the adjustment output file
+    unique_adj_enrich_file_name = "adjustedEnrichment_${peak_files}.tsv"
+    unique_adj_plot_name = "Adjusted_Enrichment_of_${peak_files}_Break_Density_Within_Peaks_Plot.pdf"
+    unique_density_calc_name = "densityCalculations_${peak_files}.log"
 
     //bam_with_sort_name = "${bams.baseName}.sorted.bam"
     //index_with_sort_name = "${index.baseName}.sorted.bam.bai"
@@ -1378,7 +1606,11 @@ process breakDensityWrapper_process {
     
     # this works but for some reason it is not seeing the output so it can be put in the published dir and also in the emit channels.
 
+    # now making unique files that represent the names of the peak files 
 
+    mv adjustedEnrichment.tsv "${unique_adj_enrich_file_name}" 
+    mv Adjusted_Enrichment_of_Break_Density_Within_Peaks_Plot.pdf "${unique_adj_plot_name}"
+    mv densityCalculations.log "${unique_density_calc_name}"
 
 
     """
@@ -1387,6 +1619,70 @@ process breakDensityWrapper_process {
 
 }
 
+// making a simple process that will take all of the tsv file and the log files and concatenate them
+
+process break_concat_results {
+
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/break_density_calc/complete_break_density_calc", mode: 'copy', pattern: '*'
+
+    // only using the conda for the second part
+    //conda '/ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh'
+
+    //conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+    
+    input:
+    path(adj_enrich_tsvs)
+
+    path(density_calc_logs)
+
+
+
+    output:
+
+    path("${adj_enrich_tsv_out}"), emit: complete_adj_enrichment
+
+    path("${density_calc_log_out}"), emit: complete_density_calc
+
+
+
+    script:
+
+    adj_enrich_tsv_out = "full_adj_enrichment.tsv"
+
+    density_calc_log_out = "full_density_calc.log"
+
+    """
+    #!/usr/bin/env bash
+
+    # I think I can separate one of the files to get the header
+
+    head -n 1 "${adj_enrich_tsvs[0]}" > "${adj_enrich_tsv_out}"
+    tail -n +2 ${adj_enrich_tsvs} >> "${adj_enrich_tsv_out}"
+
+    # do the same for density calculations
+
+    head -n 1 "${density_calc_logs[0]}" > "${density_calc_log_out}"
+    tail -n +2 ${density_calc_logs} >> "${density_calc_log_out}"
+
+
+    # I just need the full density calculations log and then I can make another full adj enrichment tsv and it will make the pdf plot
+    # i can compare my full adj enrichment tsv with the one created below using parts of andrews scripts.
+
+    source /ru-auth/local/home/risc_soft/miniconda3/etc/profile.d/conda.sh
+    conda activate rstudio
+    Rscript ../../../bin/calculateAdjustedEnrichmentV2.R full_density_calc.log
+    echo "All done!"
+
+
+
+
+
+
+    
+    """
+}
 
 
 process py_calc_stats_log {
@@ -1511,3 +1807,380 @@ process py_calc_stats_log {
 
 }
 
+
+process overlap_window {
+
+    // this process might have 945 instances  17 bedfiles times the number of peakfiles
+
+    label 'super_small_resources'
+
+    //publishDir "${params.base_out_dir}/alignment_peak_overlap_qc", mode: 'copy', pattern:'*'
+
+    //debug true
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
+
+    input:
+
+    // the order of the condition and everything else is 0GyP, PLC, 0GyC, Cells
+
+    tuple val(grouping_name), val(condition), val(basename), val(filename), path(bedfiles), path(peakfile)
+
+    //path(peaks)
+
+    // path(zero_gy)
+
+    // path(plc)
+
+    // path(cells)
+
+    // path(all_peaks)
+
+
+
+    output:
+    path("${tsv_qc_file}"), emit: tsv_qc_files
+
+
+
+    script:
+
+    if (params.gloe_seq){
+
+        out_0GyP = "${basename[1]}_intersect_${peakfile}.bed"
+
+        out_0GyC = "${basename[0]}_intersect_${peakfile}.bed"
+
+        out_plc = "${basename[3]}_intersect_${peakfile}.bed"
+
+        out_cells = "${basename[2]}_intersect_${peakfile}.bed"
+
+        tsv_qc_file = "qc_${grouping_name}_overlap_${peakfile}.tsv"
+
+
+        """
+        #!/usr/bin/env bash
+
+        echo " this is the overlap_window process gloe_seq path"
+
+        # I need to only have the first 3 fields of both the peak files and the bed files
+        # using -i inplace with awk only works if you have gawk version, and this hpc does so I am fine with editing the file without changing the name.
+
+        # 0Gyp
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[1]}  
+
+        # 0Gyc
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[0]}
+
+        # plc 
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[3]}
+
+        # cells
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[2]}
+
+        # peakfile
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${peakfile}
+
+        # first get all of the counts for reads the a bam file in each condition that intersect with the peaks in each peak files
+
+        # lets do debugging
+
+        echo "this is the 0GyP: ${filename[1]} , the 0GyC: ${filename[0]} this is plc: ${filename[3]}, this is cells: ${filename[2]}, and this is the peak file: ${peakfile}"
+
+        # now I just need to run bedtools on each of the 4 files in each process instance (17 total instances) but multiplied by now adding the peak files through the combine operator
+        
+        # first 0GyP
+        bedtools window -a ${peakfile} -b ${filename[1]} -w 150 -bed > ${out_0GyP} 
+
+        gyp_counts=\$(less ${out_0GyP} | wc -l)
+        total_gyp_counts=\$(less ${filename[1]} | wc -l)
+        percent_gyp=\$(awk "BEGIN {print (\$gyp_counts/(\$total_gyp_counts+1))*100}" )
+
+        # second 0GyC
+        bedtools window -a ${peakfile} -b ${filename[0]} -w 150 -bed > ${out_0GyC}
+        
+        gyc_counts=\$(less ${out_0GyC} | wc -l)
+        total_gyc_counts=\$(less ${filename[0]} | wc -l)
+        percent_gyc=\$(awk "BEGIN {print (\$gyc_counts/(\$total_gyc_counts+1))*100}" )
+
+        # third plc
+        bedtools window -a ${peakfile} -b ${filename[3]} -w 150 -bed > ${out_plc} 
+
+        plc_counts=\$(less ${out_plc} | wc -l)
+        total_plc_counts=\$(less ${filename[3]} | wc -l)
+        percent_plc=\$(awk "BEGIN {print (\$plc_counts/(\$total_plc_counts+1))*100}" )
+
+
+        # fourth cells
+        bedtools window -a ${peakfile} -b ${filename[2]} -w 150 -bed > ${out_cells} 
+
+        cells_counts=\$(less ${out_cells} | wc -l)
+        total_cell_counts=\$(less ${filename[2]} | wc -l)
+        percent_cell=\$(awk "BEGIN {print (\$cells_counts/(\$total_cell_counts+1))*100}" )
+
+        # now I need to get the word count of each of the conditions, that will represent how many reads are in a this instanced peak file for each condition
+
+        echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0GyP\ttotal_0GyC\ttotal_PlC\ttotal_cells\tpercent_GyP\tpercent_GyC\tpercent_PLC\tpercent_cells" > ${tsv_qc_file} # this is the header
+        echo -e "${grouping_name}\t${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}\t\${percent_gyp}\t\${percent_gyc}\t\${percent_plc}\t\${percent_cell}" >> ${tsv_qc_file} 
+
+
+
+
+        """
+    } else if(params.end_seq) {
+
+        // order of conditions in end seq is 0C1, 0P1, Cell, PLC
+        out_0GyP = "${basename[1]}_intersect_${peakfile}.bed"
+
+        out_0GyC = "${basename[0]}_intersect_${peakfile}.bed"
+
+        out_plc = "${basename[3]}_intersect_${peakfile}.bed"
+
+        out_cells = "${basename[2]}_intersect_${peakfile}.bed"
+
+        tsv_qc_file = "qc_${grouping_name}_overlap_${peakfile}.tsv"
+
+
+        """
+        #!/usr/bin/env bash
+        echo " this is the overlap_window process end_seq path"
+
+        # I need to only have the first 3 fields of both the peak files and the bed files
+        # using -i inplace with awk only works if you have gawk version, and this hpc does so I am fine with editing the file without changing the name.
+
+        # 0Gyp
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[1]}  
+
+        # 0Gyc
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[0]}
+
+        # plc 
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[3]}
+
+        # cells
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[2]}
+
+        # peakfile
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${peakfile}
+
+        # first get all of the counts for reads the a bam file in each condition that intersect with the peaks in each peak files
+
+        # lets do debugging
+
+        echo "this is the 0GyP: ${filename[1]}, the 0GyC: ${filename[0]} this is plc: ${filename[3]}, this is cells: ${filename[2]}, and this is the peak file: ${peakfile}"
+
+        # now I just need to run bedtools on each of the 4 files in each process instance (17 total instances) but multiplied by now adding the peak files through the combine operator
+        
+        # first 0GyP
+        bedtools window -a ${peakfile} -b ${filename[1]} -w 150 -bed > ${out_0GyP} 
+
+        gyp_counts=\$(less ${out_0GyP} | wc -l)
+        total_gyp_counts=\$(less ${filename[1]} | wc -l)
+        percent_gyp=\$(awk "BEGIN {print (\$gyp_counts/(\$total_gyp_counts+1))*100}" )
+
+        # second 0GyC
+        bedtools window -a ${peakfile} -b ${filename[0]} -w 150 -bed > ${out_0GyC}
+        
+        gyc_counts=\$(less ${out_0GyC} | wc -l)
+        total_gyc_counts=\$(less ${filename[0]} | wc -l)
+        percent_gyc=\$(awk "BEGIN {print (\$gyc_counts/(\$total_gyc_counts+1))*100}" )
+
+        # third plc
+        bedtools window -a ${peakfile} -b ${filename[3]} -w 150 -bed > ${out_plc} 
+
+        plc_counts=\$(less ${out_plc} | wc -l)
+        total_plc_counts=\$(less ${filename[3]}| wc -l)
+        percent_plc=\$(awk "BEGIN {print (\$plc_counts/(\$total_plc_counts+1))*100}" )
+
+
+        # fourth cells
+        bedtools window -a ${peakfile} -b ${filename[2]} -w 150 -bed > ${out_cells} 
+
+        cells_counts=\$(less ${out_cells} | wc -l)
+        total_cell_counts=\$(less ${filename[2]} | wc -l)
+        percent_cell=\$(awk "BEGIN {print (\$cells_counts/(\$total_cell_counts+1))*100}" )
+
+        # now I need to get the word count of each of the conditions, that will represent how many reads are in a this instanced peak file for each condition
+
+        echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0GyP\ttotal_0GyC\ttotal_PlC\ttotal_cells\tpercent_GyP\tpercent_GyC\tpercent_PLC\tpercent_cells" > ${tsv_qc_file} # this is the header
+        echo -e "${grouping_name}\t${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}\t\${percent_gyp}\t\${percent_gyc}\t\${percent_plc}\t\${percent_cell}" >> ${tsv_qc_file} 
+
+
+
+
+        """
+
+    }
+
+}
+
+
+process tally_break_density {
+
+    //publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*bed'
+
+    label 'super_small_resources'
+
+    input:
+
+    path(break_bed_file)
+
+
+    output:
+
+    path("${out_tsv_chr_counts}"), emit: tsv_break_counts_files
+
+
+    script:
+
+    out_tsv_chr_counts = "${break_bed_file.baseName}break_counts_per_chr.tsv"
+    sample_name = "${break_bed_file.baseName}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # get total counts from the entire file and divide the counts found per chromosome by the total to get the normalized counts for the file
+
+    # this total will include the X and Y chr counts
+    total_counts=\$(less ${break_bed_file} | wc -l)
+
+    # grep for only chr1 and count them in the file
+
+    echo -e "sample_name\tchr_name\tbreak_counts" > ${out_tsv_chr_counts}
+    for i in {1..22}; do
+
+        counts=\$(less ${break_bed_file} | grep -P "^chr\${i}(?=\t)"| wc -l)
+
+        normalized_counts=\$(awk 'BEGIN {printf "%.3f", '"\$counts"'/'"\$total_counts"'}')
+        
+        echo -e "${sample_name}\tchr\${i}\t\${normalized_counts}" >> ${out_tsv_chr_counts}
+    done
+   
+    
+
+
+
+    """
+    
+}
+
+
+
+process cell_plc_tally_break_density {
+
+    //publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*bed'
+
+    label 'super_small_resources'
+
+    input:
+
+    // the first condition (0) is cells and the second (1) is plc an thats the same for the names and paths
+    tuple val(grouping), val(conditions), val(basename), val(filename), path(filepath)
+
+
+    output:
+
+    path("${out_tsv_chr_counts}"), emit: tsv_break_counts_files
+
+
+    script:
+
+    out_tsv_chr_counts = "${grouping}_break_counts_cells_vs_plc_per_chr.tsv"
+    //sample_name = "${break_bed_file.baseName}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # get total counts from the entire file and divide the counts found per chromosome by the total to get the normalized counts for the file
+
+    # this total will include the X and Y chr counts
+    total_counts_cells=\$(less ${filename[0]} | wc -l) # this would be the total counts for the cells
+    total_counts_plc=\$(less ${filename[1]} | wc -l)  # this would be the total counts for the plc
+
+    # grep for only chr1 and count them in the file
+
+    echo -e "grouping_name\tchr_name\tbreak_counts_cells_vs_plc" > ${out_tsv_chr_counts}
+    for i in {1..22}; do
+
+        counts_cells=\$(less ${filename[0]} | grep -P "^chr\${i}(?=\t)"| wc -l)
+
+        normalized_counts_cells=\$(awk 'BEGIN {printf "%.3f", '"\$counts_cells"'/'"\$total_counts_cells"'}')
+
+        counts_plc=\$(less ${filename[1]} | grep -P "^chr\${i}(?=\t)"| wc -l)
+
+        normalized_counts_plc=\$(awk 'BEGIN {printf "%.3f", '"\$counts_plc"'/'"\$total_counts_plc"'}')
+
+        # now I will take the normalized counts for cells and divide them by the normalized counts of the plc
+        
+        counts_cells_vs_plc=\$(awk 'BEGIN {printf "%.3f", '"\$normalized_counts_cells"'/'"\$normalized_counts_plc"'}')
+
+        echo -e "${grouping}\tchr\${i}\t\${counts_cells_vs_plc}" >> ${out_tsv_chr_counts}
+    done
+   
+    
+
+
+
+    """
+    
+}
+
+process r_heatmap {
+
+    label 'normal_small_resources'
+
+    // using a different better conda env i created for R
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/R_lan_2_rj'
+
+    // this is the current R conda environment to use
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/new_r_lan_3_rj'
+
+
+    publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*.png'
+
+    // also putting the heatmap in a dir to store all heatmaps
+    publishDir "./all_heatmaps", mode: 'copy', pattern:'*.png'
+
+
+    input:
+    
+    path(break_counts_per_chr_tsv)
+
+    output:
+
+    path("${heatmap_file_out}"), emit: heat_map
+
+    script:
+
+    heatmap_file_out = "Break_Counts_per_Chromosome_${params.pe_or_se_name}_${params.expr_type}_Heatmap.png"
+
+
+    """
+    #!/usr/bin/env Rscript
+
+    library(tidyverse)
+    library(pheatmap)
+
+    #data = read.csv("break_points_bed/complete_break_counts_chr/complete_break_counts_chr.tsv", sep= '\t', header = TRUE)
+
+    data = read.csv("${break_counts_per_chr_tsv}", sep= '\t', header = TRUE)
+    names = names(data)
+
+    matrix_data = pivot_wider(data, id_cols = names[1],  names_from = names[2], values_from = names[3], values_fill = 0)
+
+    df = as.data.frame(matrix_data)
+
+    rownames(df) = df[,1]   
+
+    df = df[,-1]
+
+    matrix = as.matrix(df)
+
+    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=4, fontsize_col=4, cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows = "correlation",clustering_distance_cols = "correlation", scale = "row")
+
+
+
+    """
+}

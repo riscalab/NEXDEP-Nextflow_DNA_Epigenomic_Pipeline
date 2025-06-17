@@ -714,7 +714,7 @@ workflow se_t7_spike_in_workflow {
 
     // Now I need to pass the human genome file to the process to index the genome file. Also I will add the filtered fastq files from fastp into this process that will be aligned to the genome. 
     // each run of this only takes 20-30 min to run but since the hpc only is allowing 2-3 to run at one time it takes 3 hours
-    bwa_align_SE_spike_in(genome_ch, genome_index_files_ch, fastq_filts, fastq_filts_name, t7_genome_tuple )
+    bwa_align_SE_spike_in(genome_index_files_ch, fastq_filts, fastq_filts_name, t7_genome_tuple )
 
     //bwa_align_SE.out.sam_se_files.view()
 
@@ -965,7 +965,7 @@ workflow se_lambda_spike_in_workflow {
 
     // Now I need to pass the human genome file to the process to index the genome file. Also I will add the filtered fastq files from fastp into this process that will be aligned to the genome. 
     // each run of this only takes 20-30 min to run but since the hpc only is allowing 2-3 to run at one time it takes 3 hours
-    bwa_align_SE_spike_in(genome_ch, genome_index_files_ch, fastq_filts, fastq_filts_name, lambda_genome_tuple )
+    bwa_align_SE_spike_in(genome_index_files_ch, fastq_filts, fastq_filts_name, lambda_genome_tuple )
 
     //bwa_align_SE.out.sam_se_files.view()
 
@@ -1217,7 +1217,7 @@ workflow se_yeast_spike_in_workflow {
 
     // Now I need to pass the human genome file to the process to index the genome file. Also I will add the filtered fastq files from fastp into this process that will be aligned to the genome. 
     // each run of this only takes 20-30 min to run but since the hpc only is allowing 2-3 to run at one time it takes 3 hours
-    bwa_align_SE_spike_in(genome_ch, genome_index_files_ch, fastq_filts, fastq_filts_name, yeast_genome_tuple )
+    bwa_align_SE_spike_in(genome_index_files_ch, fastq_filts, fastq_filts_name, yeast_genome_tuple )
 
     //bwa_align_SE.out.sam_se_files.view()
 
