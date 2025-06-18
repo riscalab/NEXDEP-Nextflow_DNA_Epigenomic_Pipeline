@@ -4,6 +4,39 @@ Welcome to NEXDEP our Nextflow DNA Epigenomic Pipeline. You can take your DNA ba
 
 ### This is the pipeline so far, it will take your dna based reads and preprocess them from the fastq to bam level. The pipeline handles ATAC data and shifts the genomic coordinates in preprocessing. There are many parameters so read through them and choose the best one that works for your project. This pipeline so far includes workflows specific for hera's project with NASA data, so those parameters will only be used for that project. I will add workflows that will take the dna based bam files and call peaks and other normal downstream analysis methods for this type of data. MORE COMMING SOON
 
+# How to prepare your data (naming of files/fastqs )
+
+```
+This is the standard naming scheme that will allow the pipeline to take your fastq files, and for workflows I make in the future that take bam files; you will have to follow this naming scheme
+
+I will call each area between the underscore as a field and only use underscores (_) to separate fields not dashes (-)
+
+# Field 1: condition label. This is like the control and treatment names. In the H1 project for example, the two conditions were scrm and H1low
+
+# Field 2: experiment type. This can practically be anything, but it should in theory group the conditions so you can compare the control vs the treatment conditions. In the H1 project the conditions were histone marks like H3k27me3 and H3k9me3 and others. So you can compare the scrm vs H1low conditions in the H3k27me3 experiment type, or the scrm vs H1low conditions in the H3k9me3 experiment type. This can also be time points if in a different experiment like comparing treatment vs control conditions in the timepoint 1 experiment type.
+
+# Field 3: replicate label. This can be labeled the way you want but and example will be "r1" for replicate 1 or "r2" for replicate 2. Or you can say "replicate1" and "replicate2" as long as an underscore isnt separating anything in the naming scheme of replicates label. Now this is better to use biological replicates here and merge all technical replicates if you have both bio and tech reps. But if you only have tech reps just keep them separate and treat them as bio reps
+
+# Field 4...: the pipeline does not care about any of the fields after field 3. You can put what ever you like here to remind you of the type of files you have.
+
+Example:
+scrm_H3k27me3_r1.fastq
+H1low_H3k27me3_r1.fastq
+scrm_H3k9me3_r1.fastq
+H1low_H3k9me3_r1.fastq
+
+or bam example:
+scrm_H3k27me3_r1.bam
+H1low_H3k27me3_r1.bam
+scrm_H3k9me3_r1.bam
+H1low_H3k9me3_r1.bam
+
+
+
+```
+
+
+
 # How to run the pipeline
 
 **Make an sbatch script if you're on an HPC with SLURM**
