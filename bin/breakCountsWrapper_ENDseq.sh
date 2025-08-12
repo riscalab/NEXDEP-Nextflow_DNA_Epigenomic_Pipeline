@@ -26,10 +26,10 @@ for peak in $@
 							echo "Working on $bam"
 							echo "expectedDensity"
 							conda activate rstudio
-							expectedDensity=$(Rscript /lustre/fs4/home/ascortea/Risc_scratch/ascortea/scripts/BreakDensity/getUniformBreakDensity.R $peak hg19)
+							expectedDensity=$(Rscript /lustre/fs4/home/rjohnson/pipelines/hera_pipeline/bin/getUniformBreakDensity.R $peak hg19)
 							echo $expectedDensity
 							conda activate fastq2bam
-							bash /lustre/fs4/home/ascortea/Risc_scratch/ascortea/scripts/BreakDensity/getBreakDensityInPeaksV3_ENDseq.sh $bam $peak
+							bash /lustre/fs4/home/rjohnson/pipelines/hera_pipeline/bin/getBreakDensityInPeaksV3_ENDseq.sh $bam $peak
 							observedBreaks=$(awk '{ total += $NF } END { print total }' ${bam##*/}.${peak##*/}.numBreaksInPeaks.bed)
 							echo $observedBreaks
 							observedDensity=$(awk '{ total += $NF } END { print total }' ${bam##*/}.${peak##*/}.numBreaksInPeaksNormalized.bed)

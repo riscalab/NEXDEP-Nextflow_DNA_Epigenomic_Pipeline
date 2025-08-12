@@ -20,7 +20,8 @@ process fastp_SE_adapter_known_spike_in {
     val(adapter_seq)
     tuple val(spike_name), path(spike_genome)
 
-    publishDir "${params.base_out_dir}/fastp_qc_single_end/spike_in${spike_name}", mode: 'copy', pattern:'*_fp_filt.fastq'
+    // do not need to output these files either
+    //publishDir "${params.base_out_dir}/fastp_qc_single_end/spike_in${spike_name}", mode: 'copy', pattern:'*_fp_filt.fastq'
     publishDir "${params.base_out_dir}/fastp_qc_single_end/html_reports/spike_in${spike_name}", mode: 'copy', pattern:'*.html'
 
     output:
@@ -105,7 +106,8 @@ process fastp_SE_spike_in {
     val(fastq_names) // the names of the files as a value input channel
     tuple val(spike_name), path(spike_genome)
 
-    publishDir "${params.base_out_dir}/fastp_qc_single_end/spike_in${spike_name}", mode: 'copy', pattern:'*_fp_filt.fastq'
+    // do not need to output these files either
+    //publishDir "${params.base_out_dir}/fastp_qc_single_end/spike_in${spike_name}", mode: 'copy', pattern:'*_fp_filt.fastq'
     publishDir "${params.base_out_dir}/fastp_qc_single_end/html_reports/spike_in${spike_name}", mode: 'copy', pattern:'*.html'
 
     output:
@@ -145,8 +147,6 @@ process fastp_SE_spike_in {
     fastp \
     --in1 "${fastq_files}" \
     --out1 "${out_name}" \
-    --dedup \
-    --dup_calc_accuracy 5 \
     --trim_poly_g \
     --qualified_quality_phred 15 \
     --unqualified_percent_limit 40 \
@@ -154,7 +154,9 @@ process fastp_SE_spike_in {
     --overrepresentation_sampling 20 \
     --html "${fastq_names}_fastp.html"
 
-
+    # removed this for the SE spike in
+    #--dedup \
+    #--dup_calc_accuracy 5 \
 
 
 
@@ -266,7 +268,8 @@ process bwa_index_genome_spike_in {
     //path(ref_genome)
     tuple val(spike_name), path(ref_genome)
 
-    publishDir "./genome_index_bwa/spike_in/genome_index${spike_name}", mode: 'copy', pattern: '*'
+    // do not need to output these files either
+    //publishDir "./genome_index_bwa/spike_in/genome_index${spike_name}", mode: 'copy', pattern: '*'
 
 
     output:
@@ -324,9 +327,10 @@ process bwa_align_SE_spike_in {
     val(fastq_filt_names)
     tuple val(spike_name), path(spike_genome)
 
+    // do not need to output these files either
     // i think i can do the same here now without having too many if conditions
-    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/spike_in/sam${spike_name}", mode: 'copy', pattern: '*.sam'
-    publishDir "${params.base_out_dir}/sai_alignment_files/spike_in/sai${spike_name}", mode: 'copy', pattern: '*.sai'
+    // publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/spike_in/sam${spike_name}", mode: 'copy', pattern: '*.sam'
+    // publishDir "${params.base_out_dir}/sai_alignment_files/spike_in/sai${spike_name}", mode: 'copy', pattern: '*.sai'
 
     output:
 
@@ -391,8 +395,11 @@ process samtools_sort_spike_in {
     path(sam_files)
     tuple val(spike_name), path(spike_genome)
 
+    // do not need to output these files either
     publishDir "${params.base_out_dir}/sorted_bam_files/spike_in${spike_name}", mode: 'copy', pattern: '*_sorted.bam'
-    publishDir "${params.base_out_dir}/sorted_bam_files/spike_in${spike_name}", mode: 'copy', pattern: '*.{bai, csi}'
+    // publishDir "${params.base_out_dir}/sorted_bam_files/spike_in${spike_name}", mode: 'copy', pattern: '*.{bai, csi}'
+    
+    
     // publishDir "${params.base_out_dir}/flag_stat_log/spike_in${spike_name}", mode: 'copy', pattern: '*stats.log'
     // publishDir "${params.base_out_dir}/stats_tsv_files/spike_in${spike_name}", mode: 'copy', pattern: '*stats.tsv'
 
@@ -486,11 +493,11 @@ process samtools_sort_spike_in {
     # I should add a samtools filtering. looking to only get mapq scores higher than 30
 
     samtools view \
-    -q 30 \
     -b \
     "${sam_files}" \
     > "${out_bam_filt}" 
     
+    # removed from above becasue it messes with samtools markdup: -q 30 \
     
     # first i have to name sort to use fixmate
     samtools sort \
@@ -627,8 +634,8 @@ process deeptools_make_bed_spike_in {
     tuple path(bams), path(index)
     tuple val(spike_name), path(spike_genome)
 
-    
-    publishDir "${params.base_out_dir}/no_bl_filt/bed_graphs_deeptools/spike_in${spike_name}", mode: 'copy', pattern: '*'
+    // do not need to output these right now
+    //publishDir "${params.base_out_dir}/no_bl_filt/bed_graphs_deeptools/spike_in${spike_name}", mode: 'copy', pattern: '*'
 
     // if (params.PE) {
     //     publishDir "./results_PE/no_bl_filt/bed_graphs_deeptools/spike_in${spike_name}", mode: 'copy', pattern: '*'
@@ -863,13 +870,14 @@ process fastp_PE_spike_in {
     tuple val(fastq_name), path(fastq)
     tuple val(spike_name), path(spike_genome)
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/filt_fastqs/spike_in${spike_name}", mode: 'copy', pattern: '*_filt_{R1,R2}*'
+    // do not need to output these files either
+    // publishDir "${params.base_out_dir}/fastp_pe_results/filt_fastqs/spike_in${spike_name}", mode: 'copy', pattern: '*_filt_{R1,R2}*'
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/merged_filt_fastqs/spike_in${spike_name}", mode: 'copy', pattern: '*_merged*'
+    // publishDir "${params.base_out_dir}/fastp_pe_results/merged_filt_fastqs/spike_in${spike_name}", mode: 'copy', pattern: '*_merged*'
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/failed_qc_reads/spike_in${spike_name}", mode: 'copy', pattern: '*_failed_filter*'
+    // publishDir "${params.base_out_dir}/fastp_pe_results/failed_qc_reads/spike_in${spike_name}", mode: 'copy', pattern: '*_failed_filter*'
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/htmls/spike_in${spike_name}", mode: 'copy', pattern: '*fastp.html'
+    // publishDir "${params.base_out_dir}/fastp_pe_results/htmls/spike_in${spike_name}", mode: 'copy', pattern: '*fastp.html'
 
 
     // input:
@@ -936,8 +944,6 @@ process fastp_PE_spike_in {
     --out2 "${out_name_2}" \
     --failed_out "${failed_reads_file}" \
     --detect_adapter_for_pe \
-    --dedup \
-    --dup_calc_accuracy 5 \
     --trim_poly_g \
     --qualified_quality_phred 20 \
     --unqualified_percent_limit 40 \
@@ -951,6 +957,9 @@ process fastp_PE_spike_in {
     --html "${html_file_name}" \
     --thread 15
 
+    # i removed this from the spike in stat
+    #--dedup \
+    #--dup_calc_accuracy 5 \
     """
 
 }
@@ -1072,8 +1081,9 @@ process bwa_PE_aln_spike_in {
     path(genome_index)
     tuple val(spike_name), path(genome)
 
-    publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files/spike_in/sam${spike_name}", mode: 'copy', pattern: '*.sam'
-    publishDir "${params.base_out_dir}/pe_bwa_files/pe_sai_index_files/spike_in/sai${spike_name}", mode: 'copy', pattern: '*.sai'
+    // do not need to output these files either
+    // publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files/spike_in/sam${spike_name}", mode: 'copy', pattern: '*.sam'
+    // publishDir "${params.base_out_dir}/pe_bwa_files/pe_sai_index_files/spike_in/sai${spike_name}", mode: 'copy', pattern: '*.sai'
 
     output:
 
@@ -1212,8 +1222,8 @@ process samtools_index_sort_spike_in {
     tuple val(spike_name), path(spike_genome)
 
 
-     
-    publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_filt_bam/spike_in${spike_name}_bam", mode: 'copy', pattern: '*.{bam,bai}'
+    // do not need to output these files either 
+    //publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_filt_bam/spike_in${spike_name}_bam", mode: 'copy', pattern: '*.{bam,bai}'
 
     // if (params.PE) {
 
@@ -1602,9 +1612,10 @@ process mk_break_points_spike_in {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
 
-    publishDir "${params.base_out_dir}/break_point_bed/spike_in", mode: 'copy', pattern: '*bed'
-    //publishDir './results_PE/'
-    publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts/spike_in", mode: 'copy', pattern: '*bampe.log'
+    // do not need to output these right now
+    // publishDir "${params.base_out_dir}/break_point_bed/spike_in", mode: 'copy', pattern: '*bed'
+    // //publishDir './results_PE/'
+    // publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts/spike_in", mode: 'copy', pattern: '*bampe.log'
 
 
     input:

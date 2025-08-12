@@ -4,7 +4,11 @@
 #SBATCH -p risc,hpc
 
 #get into correct conda env
-source activate fastq2bam
+#source activate fastq2bam
+
+#get into correct conda env
+source /ru-auth/local/home/rjohnson/.bashrc_risc_soft1.sh
+conda activate /ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam
 
 # get arguments to pass into python
 bam=$1

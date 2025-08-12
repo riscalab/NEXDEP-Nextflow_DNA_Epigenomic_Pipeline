@@ -43,8 +43,8 @@ adjustedEnrichmentBams <- data.frame(CellsBam=CellsBams, PLCBam=PLCsBams, peak =
 write.table(adjustedEnrichmentBams, file='adjustedEnrichment.tsv', quote=FALSE, sep='\t', row.names = FALSE)
 
 print(adjustedEnrichmentBams)
-adjustedEnrichmentBams$CellsBam <- str_remove(basename(as.character(adjustedEnrichmentBams$CellsBam)),"_001.trim.st.all.blft.qft.rmdup.bam")
-adjustedEnrichmentBams$PLCBam <- str_remove(basename(as.character(adjustedEnrichmentBams$PLCBam)),"_001.trim.st.all.blft.qft.rmdup.bam")
+adjustedEnrichmentBams$CellsBam <- str_remove(basename(as.character(adjustedEnrichmentBams$CellsBam)),"T1_S00_filt_r1_r2_filt_coor_*")
+adjustedEnrichmentBams$PLCBam <- str_remove(basename(as.character(adjustedEnrichmentBams$PLCBam)),"T1_S00_filt_r1_r2_filt_coor_*")
 adjustedEnrichmentBams$peak <- basename(as.character(adjustedEnrichmentBams$peak))
 adjustedEnrichmentBams <- cbind(adjustedEnrichmentBams, paste0(adjustedEnrichmentBams$CellsBam, adjustedEnrichmentBams$PLCBam, adjustedEnrichmentBams$peak))
 colnames(adjustedEnrichmentBams) <- c("CellsBam", "PLCBam", "peak", "adjustedEnrichment", "unique")
@@ -57,14 +57,15 @@ ggplot(adjustedEnrichmentBams)+
   ggtitle("Adjusted Enrichment of Break Density Within Peaks") +
   ylab("Adjusted Enrichment (Cells/PLC)")+
   xlab("Sample")+
-  theme(axis.text.x = element_text(size = 10, vjust = 0.5,), 
+  theme(axis.text.x = element_text(size = 20, vjust = 0.5, angle = 90), 
         axis.text.y = element_text(size = 20, vjust = 0.5, hjust=1),
-        axis.title=element_text(size=20,face="bold"),
-        plot.title = element_text(size=22),
-        legend.text=element_text(size=14),
-        legend.title=element_text(size=14))+
+        axis.title=element_text(size=30,face="bold"),
+        plot.title = element_text(size=32),
+        legend.text=element_text(size=30),
+        legend.title=element_text(size=20),
+        strip.text = element_text(size = 30, face = "bold"))+
   labs(fill="Peaks")+
   scale_y_continuous(breaks = round(seq(min(adjustedEnrichmentBams$adjustedEnrichment)-0.05, max(adjustedEnrichmentBams$adjustedEnrichment)+0.05, by = 0.02),2))+
   coord_cartesian(ylim = c(min(adjustedEnrichmentBams$adjustedEnrichment)-0.05, max(adjustedEnrichmentBams$adjustedEnrichment)+0.05))
 
-ggsave("Adjusted_Enrichment_of_Break_Density_Within_Peaks_Plot.pdf", width = 14, height = 10, device = "pdf")
+ggsave("Adjusted_Enrichment_of_Break_Density_Within_Peaks_Plot.pdf", width = 50, height = 40, device = "pdf") # i put 40 for both height and width and it was decent with small label names though -RJ

@@ -2,9 +2,11 @@
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -p risc,hpc
+#SBATCH --mem=100G
 
 #get into correct conda env
-source activate fastq2bam
+source /ru-auth/local/home/rjohnson/.bashrc_risc_soft1.sh
+conda activate /ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam
 
 # get arguments to pass into python
 bam=$1
@@ -15,11 +17,11 @@ then
     echo "Sorted bam found, skipping sorting."
 else 
 	echo "Sorted bam not found. Sorting bam now."
-    samtools sort -o ${bam##*/}.sorted.bam -n $bam
+    samtools sort -o ${bam##*/}.sorted.bam -n $bam 2>/dev/null
 fi
 
 # filter the bam for only read 2 (which is the read that contains the break location, 3'OH adapted with i7 adapter -> this is read 2)
-samtools view -f 128 -b ${bam##*/}.sorted.bam > ${bam##*/}.sorted.R2.bam
+samtools view -f 128 -b ${bam##*/}.sorted.bam > ${bam##*/}.sorted.R2.bam 2>/dev/null
 
 # get bed regions from sorted bam and then crop it to just be intervals of insert locations, skip if already done
 if [ -f "${bam##*/}.breaks.bed" ]
