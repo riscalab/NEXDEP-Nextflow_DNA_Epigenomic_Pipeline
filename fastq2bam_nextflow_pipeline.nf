@@ -37,7 +37,8 @@ include {
     tally_break_density;
     bwa_meth_se;
     bwa_meth_pe;
-    find_methylation_stats_process
+    find_methylation_stats_process;
+    bedGraph_to_bigwig_process
 
 
 
@@ -55,7 +56,9 @@ include {
 
 include {
     breakDensityWrapper_workflow;
-    breakDensityWrapper_spike_in_workflow
+    breakDensityWrapper_Gloe_workflow;
+    breakDensityWrapper_spike_in_workflow;
+    breakDensityWrapper_Endseq_workflow
 
 
 } from './workflows/breakDensityWrapper_workflow.nf'
@@ -121,6 +124,10 @@ workflow {
     // putting the human genome in a channel
     // keeping the human genome in a value channel so i can have other processes run more than once.
     genome_ch = Channel.value(params.genome)
+
+    // need the genome/ chromosome sizes
+    params.ref_genome_size = file('/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa.fai')
+    ref_genome_size_ch = Channel.value(params.ref_genome_size)
 
     // hopefully uscs has a corresponding blacklist bed file I can use.
     // this is the only one i see on ucsc. I dont think theres a specific version for hg19 with mitochondrial
@@ -723,6 +730,12 @@ workflow {
 
         // methyDackel takes the reference genome and the bam files that has the bisulfate information
         find_methylation_stats_process(genome_ch, bam_index_tuple_ch)
+
+        cpg_site_bedgraph_ch = find_methylation_stats_process.out.cpg_location_ch
+
+        // now I want to take that bedgraph file and use ucsc tools to change it into a bigwig
+
+        bedGraph_to_bigwig_process(cpg_site_bedgraph_ch, ref_genome_size_ch)
     }
     else {
 
@@ -766,17 +779,38 @@ workflow {
 
 
         // I want to have a parameter that takes peakfiles. The default will be the IMR90 narrowPeak files
-        params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
+        //params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
+        params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.gappedPeak')
         //now making the channel for the files
-        peak_files_ch = Channel.fromPath(params.peak_files_IMR90)
+        peak_file_imr90 = Channel.fromPath(params.peak_files_IMR90)
 
         // now i need to make channels with other cell lines with the narrow peaks but also get the nulls. first other peaks
-        peak_file_HUVEC = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/HUVEC/*.narrowPeak')
-        peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.narrowPeak')
+        
+        // do not need the huvec peaks right now
+        //peak_file_HUVEC = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/HUVEC/*.narrowPeak')
+        // peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.narrowPeak')
+        
+        // Bj cells will use narrow peaks
         peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*minimal*.narrowPeak') // making sure to use only the minimal peaks.
+        
+        peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.gappedPeak')
+        //peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*minimal*.gappedPeak')
+
         //E055-DNase.macs2.narrowPeak causing problems
         // wondering if i can do this
-        all_peaks_ch = peak_files_ch.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
+        //all_peaks_ch = peak_file_imr90.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
+        all_peaks_ch = peak_file_imr90.concat(peak_file_k562, peak_file_BJ)
+
+        // ANDREW ONLY HAS SCRAMBLED PEAKS FOR GAPPED PEAKS NOT NARROW. so i will just implement his script for generageing scrambled peaks
+        // now getting the scrambled peaks from andrews directory, not making a process to use his scripts to generate them yet
+        // using gapped peaks instead
+        params.scrm_peaks_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/scrambles/20240312_filtered_scrambles/*.filtered.bed')
+        scrm_imr90_peaks = Channel.fromPath(params.scrm_peaks_IMR90)
+
+        // do not need to make a params, just use channel frompath
+        scrm_k562_peaks = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/20230511_scrambled_filtered/*filtered.bed')
+        scrm_bj_peaks = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/Filtered_Beds_narrowpeaks_20230307/*filtered.bed')
+
 
 
     }else {
@@ -954,6 +988,11 @@ workflow {
         if (!params.lambda) { pe_lambda_bam_index_tuple_ch = Channel.empty(); pe_lambda_bed_files = Channel.empty() }
         if (!params.yeast) { pe_yeast_bam_index_tuple_ch = Channel.empty(); pe_yeast_bed_files = Channel.empty() }
         
+        only_spike_bam_index_tuple_ch = pe_t7_bam_index_tuple_ch.concat(
+                                                pe_lambda_bam_index_tuple_ch,
+                                                pe_yeast_bam_index_tuple_ch
+        )
+
         all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(pe_t7_bam_index_tuple_ch,
                                                 pe_lambda_bam_index_tuple_ch, 
                                                 pe_yeast_bam_index_tuple_ch
@@ -1115,7 +1154,32 @@ workflow {
         //breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
         
         // if i dont want to have separate spike in workflow just send the spike in bam index here also. then make both channels have a value either saying normal or spike in so i can put them in different directories
-        breakDensityWrapper_workflow(bam_index_tuple_ch, only_spike_bam_index_tuple_ch, all_peaks_ch)
+        //breakDensityWrapper_workflow(bam_index_tuple_ch, only_spike_bam_index_tuple_ch, all_peaks_ch)
+
+        // I need to make another workflow that takes all the peaks separately based on cell type and experiment type
+        // so if i have cell type BJ I need to use the Gloe seq with BJ bams
+
+        //bam_index_tuple_ch.view()
+
+        // I want to add all the peak files to this workflow in the correct way but this is for gloe seq
+        //breakDensityWrapper_Gloe_workflow(bam_index_tuple_ch.take(5), peak_file_imr90.take(5), peak_file_k562.take(5), peak_file_BJ.take(5))
+        if (params.PE) {
+            // pair end data is the gloe seq data 
+            breakDensityWrapper_Gloe_workflow(bam_index_tuple_ch, peak_file_imr90, peak_file_k562, peak_file_BJ, scrm_imr90_peaks, scrm_k562_peaks, scrm_bj_peaks)
+        }
+    
+        // to make it easy for now, just make identical workflows that take the correct cell type and then use only the right peak type in that workflow
+        // or actually put it all in the same workflow and make identical processes that take the correct bams with the correct peaks for cell type.
+
+        if (params.SE) {
+
+            // single end data is the end seq data
+            breakDensityWrapper_Endseq_workflow(bam_index_tuple_ch, peak_file_imr90, peak_file_k562, peak_file_BJ, scrm_imr90_peaks, scrm_k562_peaks, scrm_bj_peaks)
+
+
+        }
+
+
        
     }
     

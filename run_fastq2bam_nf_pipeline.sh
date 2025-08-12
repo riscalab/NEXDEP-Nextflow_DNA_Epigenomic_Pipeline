@@ -8,6 +8,10 @@
 #SBATCH --job-name=nextflow_chip
 #SBATCH --partition=hpc_a10_a
 
+#partition options
+#hpc_l40_b
+#hpc_a10_a
+# try hpc_l40s_b
 #source $HOME/.bashrc_rj_test.sh   # use this it works also but not for others
 
 source /lustre/fs4/home/rjohnson/.bashrc_rj_test.sh
@@ -66,6 +70,8 @@ conda activate nextflow_three
 # NEW NOTE: I want to add another process or workflow where i take all the bam_index_tuple_ch that made it to the end of the fastq to bam pipeline and send them to fastqc then multi-qc to get a good html file showing the stats.
 #          well neither fastqc nor multiqc takes bam files to be able to do this
 
+
+###################### FOR END SEQ ###############################################
 # nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 # -resume \
 # --SE \
@@ -74,48 +80,63 @@ conda activate nextflow_three
 # --use_effectiveGenomeSize \
 # --num_effectiveGenomeSize '2864785220' \
 # --BL \
+# --end_seq \
+# --calc_break_density
+
 # --spike_in \
 # --t7 \
 # --lambda \
 # --depth_intersection \
 # --end_seq \
 # --calc_break_density
-
-nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
--resume \
---bisulfate_methylation \
---genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
---SE \
---single_end_reads '/lustre/fs4/home/rjohnson/pipelines/peak_calling_analysis_pipeline/test_published_data/sra_data/CpG_methylation/control_CpG_r1r2r3.fastq.gz' \
---ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
---use_effectiveGenomeSize \
---num_effectiveGenomeSize '2864785220' \
---BL \
--with-report 'CpG_methylation_alignment_run_number_4.html'
+##############################################################################################
 
 
 
-
+##################### For Bisulfate data ##########################################
 # nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 # -resume \
-# --PE \
-# --BL \
-# --paired_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*' \
+# --bisulfate_methylation \
+# --genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
+# --SE \
+# --single_end_reads '/ru-auth/local/home/risc_data/lab-shared-scratch/CpG_geo_control_data_rjohnson/control_CpG_r1r2r3.fastq.gz' \
+# --ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
 # --use_effectiveGenomeSize \
 # --num_effectiveGenomeSize '2864785220' \
+# --BL \
+# -with-report 'CpG_methylation_alignment_run_number_4.html'
+####################################################################################
+
+
+##################### For GLOE seq data ##########################################
+nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+-resume \
+--PE \
+--BL \
+--paired_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*' \
+--use_effectiveGenomeSize \
+--num_effectiveGenomeSize '2864785220' \
+--depth_intersection \
+--gloe_seq \
+--spike_in \
+--lambda 
+
+# dont use --calc_break_density when getting the spike in stuff
+
+# i want to run spike_in and lambda, that way i have the bam files for reads aligned to lambda genome. Then i can use that to find a scaling factor for each of the normal reads based on spike-in reads
 # --spike_in \
 # --t7 \
 # --lambda \
-# --depth_intersection \
-# --gloe_seq \
-# --calc_break_density 
+#--test
 
 #--ATAC
 #--calc_break_density \
- 
+
 
  # NOTE: If you want to make your own nextflow diagram to see how the pipeline works run this command
 
 # -with-dag fastq2bam_nf_pipeline_flowchart.png{.html,.svg,.pdf}, it seems like this alone overwrites the resume option
 # add -preview to render it without having to run the pipeline 
 # i like the html best but pdf or png might be a good second
+
+####################################################################################

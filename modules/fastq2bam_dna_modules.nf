@@ -5,7 +5,8 @@ process fastp_SE_adapter_known {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastp_rj'
 
-    publishDir "${params.base_out_dir}/fastp_qc_single_end", mode: 'copy', pattern:'*_fp_filt.fastq'
+    // do not need to output these files either
+    //publishDir "${params.base_out_dir}/fastp_qc_single_end", mode: 'copy', pattern:'*_fp_filt.fastq'
     publishDir "${params.base_out_dir}/fastp_qc_single_end/html_reports", mode: 'copy', pattern:'*.html'
 
     input:
@@ -85,7 +86,8 @@ process fastp_SE {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastp_rj'
 
-    publishDir "${params.base_out_dir}/fastp_qc_single_end", mode: 'copy', pattern:'*_fp_filt.fastq'
+    // do not need to output these files either
+    // publishDir "${params.base_out_dir}/fastp_qc_single_end", mode: 'copy', pattern:'*_fp_filt.fastq'
     publishDir "${params.base_out_dir}/fastp_qc_single_end/html_reports", mode: 'copy', pattern:'*.html'
 
     input:
@@ -271,7 +273,8 @@ process bwa_meth_pe {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_meth_align_rj'
 
-    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/CpG_sam_data", mode: 'copy', pattern: '*.sam'
+    // do not need to output these right now
+    //publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM/CpG_sam_data", mode: 'copy', pattern: '*.sam'
 
     label 'normal_big_resources'
 
@@ -308,13 +311,89 @@ process bwa_meth_pe {
     """
 }
 
+// now using MethylDackel to get the CpG location data
+
+process find_methylation_stats_process {
+
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/methyldackel_rj'
+    label 'normal_big_resources'
+    publishDir "${params.base_out_dir}/methylDackel_CpG_data", mode: 'copy', pattern: "*"
+
+
+    input:
+
+    path(genome_file)
+    tuple path(bams), path(index)
+
+
+    output:
+
+    path("*_CpG.bedGraph"), emit: cpg_location_ch
+
+    script:
+
+
+    """
+    #!/usr/bin/env bash
+
+    MethylDackel extract ${genome_file} ${bams}
+
+
+
+    """
+
+}
+
+process bedGraph_to_bigwig_process {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/uscs_utils_rj'
+    label 'normal_big_resources'
+    publishDir "${params.base_out_dir}/methylDackel_CpG_data", mode:'copy', pattern:'*'
+
+
+    input:
+
+    path(cpg_site_bedgraph)
+
+    path(chr_sizes)
+
+
+    output:
+
+    path("${out_bigwig_file_name}"), emit: cpg_bigwig_from_bedgraph
+
+
+
+    script:
+
+    out_bigwig_file_name = "${cpg_site_bedgraph.name}_bedGraph_field5_to.bigwig"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # first have to get the first 4 fields of the bedgraph 
+    cut -f 1,2,3,5 ${cpg_site_bedgraph} > new_bedGraph.bedGraph
+
+    bedGraphToBigWig new_bedGraph.bedGraph ${chr_sizes} ${out_bigwig_file_name}
+
+
+
+
+
+    """
+}
+
+
 // Creating two processes that will index the reference genome
 
 process bwa_index_genome {
     conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
 
     
-    publishDir './genome_index_bwa', mode: 'copy', pattern: '*'
+    // do not need to output these files either
+    // publishDir './genome_index_bwa', mode: 'copy', pattern: '*'
 
 
     input:
@@ -357,8 +436,9 @@ process bwa_index_genome {
 process bwa_align_SE {
     conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
 
-    publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM", mode: 'copy', pattern: '*.sam'
-    publishDir "${params.base_out_dir}/sai_alignment_files", mode: 'copy', pattern: '*.sai'
+    // do not need to output these files either
+    // publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM", mode: 'copy', pattern: '*.sam'
+    // publishDir "${params.base_out_dir}/sai_alignment_files", mode: 'copy', pattern: '*.sai'
 
 
     input:
@@ -426,16 +506,16 @@ process samtools_sort {
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
 
-    
-    if (!params.BL) {
-        publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*_sorted.bam'
-        publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*.{bai, csi}'
+    // do not need to output these files either right now
+    // if (!params.BL) {
+    //     publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*_sorted.bam'
+    //     publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*.{bai, csi}'
 
-    }else {
+    // }else {
 
         
 
-    }
+    // }
     // publishDir "${params.base_out_dir}/flag_stat_log", mode: 'copy', pattern: '*stats.log'
     // publishDir "${params.base_out_dir}/stats_tsv_files", mode: 'copy', pattern: '*stats.tsv'
 
@@ -512,10 +592,11 @@ process samtools_sort {
     # I should add a samtools filtering. looking to only get mapq scores higher than 30
 
     samtools view \
-    -q 30 \
     -b \
     "${sam_files}" \
     > "${out_bam_filt}" 
+
+    # removed this from above because it messes with samtools markdup: -q 30 \
     
     
     # first i have to name sort to use fixmate
@@ -536,10 +617,11 @@ process samtools_sort {
     # now i will coordinate sort here 
     # will also add the read group sort
     samtools sort \
-    -t RG \
     -o "${out_bam_coor_sort}" \
     -O bam \
     "${out_bam_fixmate}"
+
+    # removed this from above because it messes with samtools markdup: -t RG \
 
 
     # i might need to put coordinate sorted bam into markdup
@@ -602,6 +684,10 @@ process bam_log_calc {
     samtools_stats_log = "${bam.baseName}_stats.txt"
     tsv_file_with_stats = "${bam.baseName}_SN_stats.tsv"
 
+    dup_bam = "${bam.baseName}.dup.bam"
+    name_sorted_bam = "${bam.baseName}.namesort.bam"
+    fixmate_bam = "${bam.baseName}.fixmate.bam"
+    sort_fixmate = "${bam.baseName}.fixmate.sort.bam"
 
     """
     #!/usr/bin/env bash
@@ -609,15 +695,34 @@ process bam_log_calc {
     # using samtools flagstat: generate log files so i can use multiqc to get stats of all files into one html file
     # no parameters needed. just need to give the final bam file that went through all the processing
 
+    # try this new stuff 
+    # Step 1: Sort by read name (needed for fixmate)
+    samtools sort -n -o "${name_sorted_bam}" "${bam}"
 
-    samtools flagstat \
-    "${bam}" \
-    > "${flagstats_log}"
+    # Step 2: Add mate coordinates and flags
+    samtools fixmate -m "${name_sorted_bam}" "${fixmate_bam}"
+
+    # Step 3: Sort by coordinate (needed for markdup)
+    samtools sort -o "${sort_fixmate}" "${fixmate_bam}"
+
+    # Step 4: Mark duplicates (without removing them)
+    samtools markdup "${sort_fixmate}" "${dup_bam}"
+
+    # Step 5: Index final BAM
+    samtools index "${dup_bam}"
+
+    # Step 6: Get stats for MultiQC
+    samtools flagstat "${dup_bam}" > "${flagstats_log}"
+    samtools stats "${dup_bam}" > "${samtools_stats_log}"
+
+    #samtools flagstat \
+    "\${bam}" \
+    > "\${flagstats_log}"
 
     # adding another way to get stats from each bam file
-    samtools stats \
-    "${bam}" \
-    > "${samtools_stats_log}"
+    #samtools stats \
+    "\${bam}" \
+    > "\${samtools_stats_log}"
 
     # now only putting the stats into a tsv file
     less "${samtools_stats_log}" | grep ^SN | cut -f 2-3 >  "${tsv_file_with_stats}"
@@ -646,15 +751,15 @@ process deeptools_make_bed {
     // this section is just a simple if else statement controlling the directories that are created and when the files end up
     // will copy and paste in other processes that need it.
     
+    // do not need to output these right now
+    // if (params.BL) {
 
-    if (params.BL) {
+    //     publishDir "${params.base_out_dir}/bl_filt_bed/bed_graphs_deeptools/", mode: 'copy', pattern: '*'
 
-        publishDir "${params.base_out_dir}/bl_filt_bed/bed_graphs_deeptools/", mode: 'copy', pattern: '*'
-
-    }
-    else {
-        publishDir "${params.base_out_dir}/no_bl_filt/bed_graphs_deeptools/", mode: 'copy', pattern: '*'
-    }
+    // }
+    // else {
+    //     publishDir "${params.base_out_dir}/no_bl_filt/bed_graphs_deeptools/", mode: 'copy', pattern: '*'
+    // }
     
     
 
@@ -666,12 +771,91 @@ process deeptools_make_bed {
 
     output:
     path("${out_bed_name}*"), emit: bed_files_normalized
+    path("${out_bigwig_name}*"), emit: bigwig_files_normalized
 
     script:
 
     out_bed_name="${bams.baseName}_normalized_cpm.bed"
+    out_bigwig_name = "${bams.baseName}_normalized_cpm.bigwig"
 
-    if (params.use_effectiveGenomeSize) {
+    // now I implemented a way to have the pipeline make the bin size equal to 1 if the user is working with bisulfate methylation data.
+    if (params.bisulfate_methylation) {
+
+        if (params.use_effectiveGenomeSize) {
+
+            """
+
+            ###### Using deeptools parameters ###############
+
+            # first converting the bam file to a bed file using bamCoverage. I can also make a bigwig file if needed, it stores data better but is binary and cannot be opened in text editor
+            # -b or --bam: takes the bam file that will be processed
+            # -o or --outFileName: is the name you want the output file to have
+            # -of or --outFileFormat: is the type of output file you want; either "bigwig" or "bedgraph"
+            # --scaleFactor: the computed scaling factor (or 1, if not applicable) will be multiplied by this.
+            # -bs or --binSize: are the size of the bins in bases, for output of bigwig or bedgraph. default is 50
+            # -p or --numberOfProcessors: this is the number of processers you want to use. Not using this option yet but if needed I will use it.
+            # --normalizeUsing: choose the type of normalization
+            # bamCoverage offers normalization by scaling factor, Reads Per Kilobase per Million mapped reads (RPKM), counts per million (CPM), bins per million mapped reads (BPM) and 1x depth (reads per genome coverage, RPGC).
+            # --effectiveGenomeSize: choose the mappable genome size for your organism of choice used as reference. find length here: https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
+            # not using effectiveGenomeSize since multiple users will use this pipeline and might not be using the same organism.
+            # actually i decided to use effectiveGenomeSize afterall since i can split this process into using it or not.
+
+            # NOTE: since all the files will be processed using this tool and parameters, they will all be directly comparable in UCSC or IGV without needing to edit track heights.
+            #################################################
+
+
+            bamCoverage \
+            --bam "${bams}" \
+            --outFileName "${out_bed_name}" \
+            --outFileFormat "bedgraph" \
+            --scaleFactor 1 \
+            --binSize 10 \
+            --normalizeUsing CPM \
+            --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
+            --skipNonCoveredRegions
+
+            bamCoverage \
+            --bam "${bams}" \
+            --outFileName "${out_bigwig_name}" \
+            --outFileFormat "bigwig" \
+            --scaleFactor 1 \
+            --binSize 10 \
+            --normalizeUsing CPM \
+            --effectiveGenomeSize "${params.num_effectiveGenomeSize}"
+
+
+            """
+
+
+        }
+        else {
+
+            """
+
+            bamCoverage \
+            --bam "${bams}" \
+            --outFileName "${out_bed_name}" \
+            --outFileFormat "bedgraph" \
+            --scaleFactor 1 \
+            --binSize 10 \
+            --normalizeUsing CPM \
+            --skipNonCoveredRegions
+
+            bamCoverage \
+            --bam "${bams}" \
+            --outFileName "${out_bigwig_name}" \
+            --outFileFormat "bigwig" \
+            --scaleFactor 1 \
+            --binSize 10 \
+            --normalizeUsing CPM
+
+            """
+
+        }
+    }
+    else {
+
+        if (params.use_effectiveGenomeSize) {
 
         """
 
@@ -701,6 +885,16 @@ process deeptools_make_bed {
         --scaleFactor 1 \
         --binSize 50 \
         --normalizeUsing CPM \
+        --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
+        --skipNonCoveredRegions
+
+        bamCoverage \
+        --bam "${bams}" \
+        --outFileName "${out_bigwig_name}" \
+        --outFileFormat "bigwig" \
+        --scaleFactor 1 \
+        --binSize 50 \
+        --normalizeUsing CPM \
         --effectiveGenomeSize "${params.num_effectiveGenomeSize}"
 
 
@@ -718,10 +912,20 @@ process deeptools_make_bed {
         --outFileFormat "bedgraph" \
         --scaleFactor 1 \
         --binSize 50 \
+        --normalizeUsing CPM \
+        --skipNonCoveredRegions
+
+        bamCoverage \
+        --bam "${bams}" \
+        --outFileName "${out_bigwig_name}" \
+        --outFileFormat "bigwig" \
+        --scaleFactor 1 \
+        --binSize 50 \
         --normalizeUsing CPM
 
         """
 
+    }
     }
 
 }
@@ -790,6 +994,7 @@ process samtools_bl_index {
     //     publishDir "${params.base_out_dir}/blacklist_filt_bam", mode: 'copy', pattern: '*_sort2.bam'
     // }
 
+    // do not want to output the bam files right now
     publishDir "${params.base_out_dir}/sorted_bam_files/blacklist_filt_bam", mode: 'copy', pattern: '*.bai'
     publishDir "${params.base_out_dir}/sorted_bam_files/blacklist_filt_bam", mode: 'copy', pattern: '*_sort2.bam'
     
@@ -835,11 +1040,12 @@ process fastp_PE {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastp_rj'
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/filt_fastqs", mode: 'copy', pattern: '*_filt_{R1,R2}*'
+    // do not want to output any of the fastq files either
+    // publishDir "${params.base_out_dir}/fastp_pe_results/filt_fastqs", mode: 'copy', pattern: '*_filt_{R1,R2}*'
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/merged_filt_fastqs", mode: 'copy', pattern: '*_merged*'
+    // publishDir "${params.base_out_dir}/fastp_pe_results/merged_filt_fastqs", mode: 'copy', pattern: '*_merged*'
 
-    publishDir "${params.base_out_dir}/fastp_pe_results/failed_qc_reads", mode: 'copy', pattern: '*_failed_filter*'
+    // publishDir "${params.base_out_dir}/fastp_pe_results/failed_qc_reads", mode: 'copy', pattern: '*_failed_filter*'
 
     publishDir "${params.base_out_dir}/fastp_pe_results/htmls", mode: 'copy', pattern: '*fastp.html'
 
@@ -1021,7 +1227,9 @@ process bwa_PE_aln {
 
     conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
 
-    publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files", mode: 'copy', pattern: '*.{sam, sai}'
+    // do not want to output the sam or bam files anymore
+    //publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files", mode: 'copy', pattern: '*.{sam, sai}'
+    
     //publishDir "${params.base_out_dir}/pe_bwa_files/pe_sai_index_files", mode: 'copy', pattern: '*.sai'
     //cache false 
 
@@ -1223,18 +1431,18 @@ process samtools_index_sort {
 
     //publishDir './blacklist_filt_bam/bl_filt_index', mode: 'copy', pattern:'*.bai'
     
+    // do not need to output these files either
+    // if (params.ATAC && params.BL) {
+    //     // I want to put both the bam and the index (bai) in the same channel
+    //     publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_blacklist_filt_bam", mode: 'copy', pattern: '*.bai'
+    //     publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_blacklist_filt_bam", mode: 'copy', pattern: '*_sort2.bam'
 
-    if (params.ATAC && params.BL) {
-        // I want to put both the bam and the index (bai) in the same channel
-        publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_blacklist_filt_bam", mode: 'copy', pattern: '*.bai'
-        publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_blacklist_filt_bam", mode: 'copy', pattern: '*_sort2.bam'
+    // }
+    // else if(params.ATAC) {
 
-    }
-    else if(params.ATAC) {
-
-        publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_filt_bam", mode: 'copy', pattern: '*.bai'
-        publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_filt_bam", mode: 'copy', pattern: '*_sort2.bam'
-    }
+    //     publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_filt_bam", mode: 'copy', pattern: '*.bai'
+    //     publishDir "${params.base_out_dir}/sorted_bam_files/ATAC_filt_bam", mode: 'copy', pattern: '*_sort2.bam'
+    // }
 
 
 
@@ -1288,9 +1496,10 @@ process mk_break_points {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bedtools_rj'
 
-    publishDir "${params.base_out_dir}/break_point_bed", mode: 'copy', pattern: '*bed'
-    //publishDir './results_PE/'
-    publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts", mode: 'copy', pattern: '*bampe.log'
+    // do not need to publish these right now
+    // publishDir "${params.base_out_dir}/break_point_bed", mode: 'copy', pattern: '*bed'
+    // //publishDir './results_PE/'
+    // publishDir "${params.base_out_dir}/break_point_bed/bampe_unmapped_counts", mode: 'copy', pattern: '*bampe.log'
 
 
     input:
@@ -1549,6 +1758,7 @@ process rg_sort {
 process breakDensityWrapper_process {
 
     //debug true
+    cache false
 
     conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
 
@@ -1577,8 +1787,29 @@ process breakDensityWrapper_process {
     //path("${unique_adj_plot_name}"), emit: break_plot_pdf
     path("${unique_density_calc_name}"), emit: density_calc_log
 
+    // i should output the actual plot to see it
+    path("${unique_adj_plot_name}"), emit: adjusted_E_pdf
+
 
     script:
+
+    // strip the names of the files so they are shorter
+
+    // new_bams = []
+    // num_bam_files = bams.size()
+
+    // for (int i = 0; i < num_bam_files; i++) {
+    //     bam_split_base = "${bams[i]}".split('_')
+
+    //     new_name = "${bam_split_base[0]}_${bam_split_base[1]}_${bam_split_base[2]}.bam"
+
+    //     new_bams << new_name
+
+    //     final_name = bams[i].renameTo(new_name)
+
+    // }
+
+    //println("these are the new names of the bam files: ${new_bams}")
 
     // if i get the peak file name, I can use the base name in the adjustment output file
     unique_adj_enrich_file_name = "adjustedEnrichment_${peak_files}.tsv"
@@ -1617,6 +1848,389 @@ process breakDensityWrapper_process {
 
 
 
+}
+
+// i need to run the gleo seq data through the gloe seq wrapper so here is the process to do so
+
+process gloe_imr90_wrapper_process {
+
+    debug true
+    //cache false
+    errorStrategy 'ignore'
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    publishDir "${params.base_out_dir}/break_density_calc/gloe_seq/${cell_type}", mode: 'copy', pattern: '*'
+
+    label 'normal_big_resources'
+
+    input:
+
+    tuple val(cell_type), val(bio_rep_type), val(expr_type), val(bam_name), path(bam_file), path(bai_file), path(peak_file)
+
+
+    output:
+
+    path("*real_peaks.log"), emit: imr90_all_outputs
+
+
+    script:
+
+    // i need to change the name of the output files and give a unique name for this experiment
+
+    density_calc_normal_log = "densityCalculations.norm_${cell_type}_real_peaks.log"
+
+    density_calc_plus_log = "densityCalculations.plus_${cell_type}_real_peaks.log"
+
+    density_calc_minus_log = "densityCalculations.minus_${cell_type}_real_peaks.log"
+
+    // make the bams a list
+    //list_bams = "${bam_name.toList}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # for debugging 
+    echo "these are the bams: ${bam_name.join(' ')}"
+    echo "these are the peak files: ${peak_file}"
+
+    # now I want to use the gloe seq break density wrapper script with the bams and peak files
+
+    breakCountsWrapper_GLOEseq.sh ${peak_file} ${bam_name.join(' ')} 
+
+    # now I need to change the name of the file to the new unique cell type name
+
+    mv densityCalculations.log "${density_calc_normal_log}"
+
+    mv densityCalculations.plus.log "${density_calc_plus_log}"
+
+    mv densityCalculations.minus.log "${density_calc_minus_log}"
+
+
+    """
+}
+
+// making the same exact process as above but for outputting the scrm versions of breakdensity gloe seq
+
+process gloe_celltypes_wrapper_scrm_process {
+
+    debug true
+    //cache false
+    errorStrategy 'ignore'
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    publishDir "${params.base_out_dir}/break_density_calc/gloe_seq/${cell_type}", mode: 'copy', pattern: '*'
+
+    label 'normal_big_resources'
+
+    input:
+
+    tuple val(cell_type), val(bio_rep_type), val(expr_type), val(bam_name), path(bam_file), path(bai_file), path(peak_file)
+
+
+    output:
+
+    path("*scrm_peaks.log"), emit: imr90_all_outputs
+
+
+    script:
+
+    // i need to change the name of the output files and give a unique name for this experiment
+
+    density_calc_normal_log = "densityCalculations.norm_${cell_type}_scrm_peaks.log"
+
+    density_calc_plus_log = "densityCalculations.plus_${cell_type}_scrm_peaks.log"
+
+    density_calc_minus_log = "densityCalculations.minus_${cell_type}_scrm_peaks.log"
+
+    // make the bams a list
+    //list_bams = "${bam_name.toList}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # for debugging 
+    echo "these are the bams: ${bam_name.join(' ')}"
+    echo "these are the peak files: ${peak_file}"
+
+    # now I want to use the gloe seq break density wrapper script with the bams and peak files
+
+    breakCountsWrapper_GLOEseq.sh ${peak_file} ${bam_name.join(' ')} 
+
+    # now I need to change the name of the file to the new unique cell type name
+
+    mv densityCalculations.log "${density_calc_normal_log}"
+
+    mv densityCalculations.plus.log "${density_calc_plus_log}"
+
+    mv densityCalculations.minus.log "${density_calc_minus_log}"
+
+
+    """
+}
+
+
+// now i have to take these two processes and put the end seq density wrapper in it
+
+process endseq_celltypes_wrapper_process {
+
+    debug true
+    //cache false
+    errorStrategy 'ignore'
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    publishDir "${params.base_out_dir}/break_density_calc/end_seq/${cell_type}", mode: 'copy', pattern: '*'
+
+    label 'normal_big_resources'
+
+    input:
+
+    tuple val(cell_type), val(bio_rep_type), val(expr_type), val(bam_name), path(bam_file), path(bai_file), path(peak_file)
+
+
+    output:
+
+    path("*real_peaks.log"), emit: imr90_all_outputs
+
+
+    script:
+
+    // i need to change the name of the output files and give a unique name for this experiment
+
+    density_calc_normal_log = "densityCalculations.norm_${cell_type}_real_peaks.log"
+
+    // density_calc_plus_log = "densityCalculations.plus_${cell_type}_real_peaks.log"
+
+    // density_calc_minus_log = "densityCalculations.minus_${cell_type}_real_peaks.log"
+
+    // make the bams a list
+    //list_bams = "${bam_name.toList}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # for debugging 
+    echo "these are the bams: ${bam_name.join(' ')}"
+    echo "these are the peak files: ${peak_file}"
+
+    # now I want to use the gloe seq break density wrapper script with the bams and peak files
+
+    breakCountsWrapper_ENDseq.sh  ${peak_file} ${bam_name.join(' ')} 
+
+    # now I need to change the name of the file to the new unique cell type name
+
+    mv densityCalculations.log "${density_calc_normal_log}"
+
+    #mv densityCalculations.plus.log "\${density_calc_plus_log}"
+
+    #mv densityCalculations.minus.log "\${density_calc_minus_log}"
+
+
+    """
+}
+
+// making the same exact process as above but for outputting the scrm versions of breakdensity gloe seq
+
+process endseq_celltypes_wrapper_scrm_process {
+
+    debug true
+    //cache false
+    errorStrategy 'ignore'
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    publishDir "${params.base_out_dir}/break_density_calc/end_seq/${cell_type}", mode: 'copy', pattern: '*'
+
+    label 'normal_big_resources'
+
+    input:
+
+    tuple val(cell_type), val(bio_rep_type), val(expr_type), val(bam_name), path(bam_file), path(bai_file), path(peak_file)
+
+
+    output:
+
+    path("*scrm_peaks.log"), emit: imr90_all_outputs
+
+
+    script:
+
+    // i need to change the name of the output files and give a unique name for this experiment
+
+    density_calc_normal_log = "densityCalculations.norm_${cell_type}_scrm_peaks.log"
+
+    // density_calc_plus_log = "densityCalculations.plus_${cell_type}_scrm_peaks.log"
+
+    // density_calc_minus_log = "densityCalculations.minus_${cell_type}_scrm_peaks.log"
+
+    // make the bams a list
+    //list_bams = "${bam_name.toList}"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # for debugging 
+    echo "these are the bams: ${bam_name.join(' ')}"
+    echo "these are the peak files: ${peak_file}"
+
+    # now I want to use the gloe seq break density wrapper script with the bams and peak files
+
+    breakCountsWrapper_ENDseq.sh  ${peak_file} ${bam_name.join(' ')} 
+
+    # now I need to change the name of the file to the new unique cell type name
+
+    mv densityCalculations.log "${density_calc_normal_log}"
+
+    #mv densityCalculations.plus.log "\${density_calc_plus_log}"
+
+    #mv densityCalculations.minus.log "\${density_calc_minus_log}"
+
+
+    """
+}
+
+process filt_gloe_bam_samtools_process {
+
+    //label 'normal_big_resources'
+    label 'normal_small_resources'
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
+    publishDir "${params.base_out_dir}/bams_read1_filt", mode: 'copy', pattern:'*'
+
+
+
+    input:
+
+    tuple path(bam), path(bam_index)
+
+
+    output:
+
+    tuple path("${out_bam_file}"), path("*.read1.filt.bam.bai"), emit: bam_filt_r1_gloe
+
+
+    script:
+    // output file name
+
+    out_bam_file = "${bam.baseName}.read1.filt.bam"
+    out_bai_file = "${bam.baseName}.read1.filt.bam.bai"
+
+    """
+    #!/usr/bin/env bash
+
+    samtools view -f 64 --bam  ${bam} | samtools sort -o "${out_bam_file}"
+
+    samtools index --bai "${out_bam_file}"
+
+
+    """
+}
+
+// need to just get bigwig files of each bam file from gloe seq
+process make_bigwig_gloe_process {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/deeptools_rj'
+
+    label 'normal_big_resources'
+
+    publishDir "${params.base_out_dir}/gloe_seq_bigwigs", mode: 'copy', pattern:'*'
+
+
+    input:
+
+    tuple path(bam), path(bam_index)
+
+    
+
+
+    output:
+
+    path("${base_bam_name}"), emit: gloe_bigwig_mt
+
+
+    script:
+    base_bam_name = "${bam.baseName}.chrMT.bigwig"
+
+    """
+    #!/usr/bin/env bash
+
+    bamCoverage \
+    --bam ${bam} \
+    --normalizeUsing RPGC \
+    --region chrMT \
+    --Offset 1 \
+    --binSize 1 \
+    --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
+    --outFileName "${base_bam_name}" \
+    --outFileFormat "bigwig"
+
+
+
+
+    """
+}
+
+// now get the process for find the ratio of cell vs plc 
+
+process get_ratio_cell_vs_plc_bigwig_process {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/deeptools_rj'
+
+    label 'normal_small_resources'
+
+    publishDir "${params.base_out_dir}/gloe_seq_bigwigs/ratio_bigwigs", mode: 'copy', pattern: '*'
+
+
+
+
+    input: 
+
+    // note that the bigwig_name will have cell first (0) and plc second (1)
+    // cell_plc_label will be in that order also
+    // cell_type and bio_rep are individual values and can be used to make file names
+    tuple val(cell_type), val(bio_rep), val(cell_plc_label), val(bigwig_name), path(bigwig_path)
+
+
+    output:
+
+    path("${output_name}"), emit: cell_plc_ratio_bigwigs
+
+
+    script:
+
+    cell_label = cell_plc_label[0]
+    plc_label = cell_plc_label[1]
+
+    cells_bigwig = bigwig_name[0]
+    plc_bigwig = bigwig_name[1]
+
+    // output file name whcih will show cells/plc ratio
+    //output_name = "${cell_type}_${bio_rep}.${cell_label}_vs_${plc_label}_ratio.bigwig"
+
+    // outputting to log2 instead of ratio. this should be saved in a different file 
+    output_name = "${cell_type}_${bio_rep}.${cell_label}_vs_${plc_label}_log2.bigwig"
+
+    """
+    #!/usr/bin/env bash
+
+    bigwigCompare \
+    --bigwig1 "${cells_bigwig}" \
+    --bigwig2 "${plc_bigwig}" \
+    --pseudocount 1 \
+    --operation "log2" \
+    --outFileName "${output_name}" \
+    --outFileFormat "bigwig"
+
+
+
+
+
+    """
 }
 
 // making a simple process that will take all of the tsv file and the log files and concatenate them
@@ -2131,11 +2745,15 @@ process r_heatmap {
 
     label 'normal_small_resources'
 
+    debug true
+
     // using a different better conda env i created for R
     //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/R_lan_2_rj'
 
     // this is the current R conda environment to use
-    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/new_r_lan_3_rj'
+    // recently changed to using the r environment from the peak calling pipeline
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/r_language'
+    //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/new_r_lan_3_rj'
 
 
     publishDir "${params.base_out_dir}/break_point_bed/complete_break_chr_matrix_tsv", mode: 'copy', pattern: '*.png'
@@ -2165,11 +2783,13 @@ process r_heatmap {
 
     #data = read.csv("break_points_bed/complete_break_counts_chr/complete_break_counts_chr.tsv", sep= '\t', header = TRUE)
 
+    print("this is the tsv file: ${break_counts_per_chr_tsv}")
     data = read.csv("${break_counts_per_chr_tsv}", sep= '\t', header = TRUE)
     names = names(data)
 
     matrix_data = pivot_wider(data, id_cols = names[1],  names_from = names[2], values_from = names[3], values_fill = 0)
 
+    
     df = as.data.frame(matrix_data)
 
     rownames(df) = df[,1]   
@@ -2178,7 +2798,7 @@ process r_heatmap {
 
     matrix = as.matrix(df)
 
-    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=4, fontsize_col=4, cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows = "correlation",clustering_distance_cols = "correlation", scale = "row")
+    pheatmap(matrix, color = colorRampPalette(heat.colors(7))(100), main = "Break Counts per Chromosome Heatmap ${params.pe_or_se_name} ${params.expr_type}", filename = "${heatmap_file_out}", fontsize_row=9, fontsize_col=9, cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows = "correlation", clustering_distance_cols = "correlation", scale = "row")
 
 
 
