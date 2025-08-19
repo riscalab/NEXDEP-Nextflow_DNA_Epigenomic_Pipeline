@@ -2183,7 +2183,7 @@ process get_ratio_cell_vs_plc_bigwig_process {
 
     label 'normal_small_resources'
 
-    publishDir "${params.base_out_dir}/gloe_seq_bigwigs/ratio_bigwigs", mode: 'copy', pattern: '*'
+    publishDir "${params.base_out_dir}/${params.expr_type}_bigwigs/ratio_bigwigs", mode: 'copy', pattern: '*'
 
 
 
@@ -2202,6 +2202,7 @@ process get_ratio_cell_vs_plc_bigwig_process {
 
 
     script:
+
 
     cell_label = cell_plc_label[0]
     plc_label = cell_plc_label[1]
@@ -2226,6 +2227,52 @@ process get_ratio_cell_vs_plc_bigwig_process {
     --outFileName "${output_name}" \
     --outFileFormat "bigwig"
 
+
+
+
+
+    """
+}
+
+
+// need to just get bigwig files of each bam file from end seq
+process make_bigwig_endseq_process {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/deeptools_rj'
+
+    label 'normal_big_resources'
+
+    publishDir "${params.base_out_dir}/${params.expr_type}_bigwigs", mode: 'copy', pattern:'*'
+
+
+    input:
+
+    tuple path(bam), path(bam_index)
+
+    
+
+
+    output:
+
+    path("${base_bam_name}"), emit: endseq_bigwig_mt
+
+
+    script:
+    base_bam_name = "${bam.baseName}.chrMT.bigwig"
+
+    """
+    #!/usr/bin/env bash
+
+    # because this is end seq, we should find the first position of read 1 so the 5' end
+    bamCoverage \
+    --bam ${bam} \
+    --normalizeUsing RPGC \
+    --region chrMT \
+    --Offset 1 \
+    --binSize 1 \
+    --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
+    --outFileName "${base_bam_name}" \
+    --outFileFormat "bigwig"
 
 
 
@@ -2318,7 +2365,7 @@ process py_calc_stats_log {
 
     output:
 
-    path("bam_*.tsv"), emit: pe_tsv_log
+    path("*bam*.tsv"), emit: pe_tsv_log
     path("*stats.txt")
     path("*stats.html")
     
@@ -2332,7 +2379,11 @@ process py_calc_stats_log {
     name_of_file = "${tsv_names}"
     //pe_log_file_out = "pe_bam_stats_log.tsv"
     //se_log_file_out = "se_bam_stats_log.tsv"
-    log_file_out = "bam_stats_log.tsv"
+    log_file_out = "${params.expr_type}_bam_stats_log.tsv"
+
+    html_out_file = "${params.expr_type}_table_bam_stats.html"
+
+    txt_out_file = "${params.expr_type}_table_pipe_stats.txt"
 
     """
     #!/usr/bin/env python
@@ -2405,11 +2456,11 @@ process py_calc_stats_log {
 
     table_html = tabulate(data, headers = data.columns.to_list(), tablefmt = 'html')
 
-    file_pipe = open('table_pipe_stats.txt', 'w')
+    file_pipe = open("${txt_out_file}", 'w')
     file_pipe.write(table_pipe)
     file_pipe.close()
 
-    file_html = open('table_bam_stats.html','w')
+    file_html = open("${html_out_file}",'w')
     file_html.write(table_html)
     file_html.close()
 

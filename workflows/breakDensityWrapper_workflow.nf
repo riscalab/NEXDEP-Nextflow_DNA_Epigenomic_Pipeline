@@ -19,7 +19,9 @@ include {
     get_ratio_cell_vs_plc_bigwig_process;
     gloe_celltypes_wrapper_scrm_process;
     endseq_celltypes_wrapper_process;
-    endseq_celltypes_wrapper_scrm_process
+    endseq_celltypes_wrapper_scrm_process;
+    make_bigwig_endseq_process;
+    get_ratio_cell_vs_plc_bigwig_process as get_endseq_ratio_cell_vs_plc_bigwig_process
 
 
 
@@ -515,43 +517,45 @@ workflow breakDensityWrapper_Endseq_workflow {
 
         // i would need to filter the bam using samtools to get only read1 for gloe seq
         // HAVE TO FIND HOW TO DO THIS FOR END SEQ
+        // I DO NOT NEED TO FILTER FOR READ 1 HERE, because it is pair end and is only using one read
         // filt_gloe_bam_samtools_process(bam_index_tuple_ch)
         // r1_filt_gloe_bams = filt_gloe_bam_samtools_process.out.bam_filt_r1_gloe
         // //r1_filt_gloe_bams.view{it -> "these are the gloe bams index tuple that are filt by read1: $it"}
 
-        // //get the bigwig files from each of the bam files
-        // //make_bigwig_gloe_process(bam_index_tuple_ch)
-        // make_bigwig_gloe_process(r1_filt_gloe_bams)
+        //get the bigwig files from each of the bam files
+        //make_bigwig_gloe_process(bam_index_tuple_ch)
+        make_bigwig_endseq_process(bam_index_tuple_ch)
 
-        // // getting the chrmt bigwigs
-        // gloe_bigwig_chrmt_ch = make_bigwig_gloe_process.out.gloe_bigwig_mt
+        // getting the chrmt bigwigs
+        endseq_bigwig_chrmt_ch = make_bigwig_endseq_process.out.endseq_bigwig_mt
 
-        // // now to filter for only plc and cells
-        // gloe_bigwig_chrmt_ch
-        //     .filter(~/.*(?:Cell|PLC).*/)
-        //     .map{ file ->
+        // I HAVE TO CHANGE TOKENS HERE
+        // now to filter for only plc and cells
+        endseq_bigwig_chrmt_ch
+            .filter(~/.*(?:Cell|PLC).*/)
+            .map{ file ->
             
-        //     bigwig_basename = file.baseName
-        //     bigwig_filename = file.name
+            bigwig_basename = file.baseName
+            bigwig_filename = file.name
 
-        //     tokens = bigwig_basename.tokenize("_")
+            tokens = bigwig_basename.tokenize("_")
+    
+            biorep = tokens[3]  // was 1
+            expr_type = tokens[1] // was 2
+            cell_type = tokens[0] // was 0
 
-        //     biorep = tokens[1]
-        //     expr_type = tokens[2]
-        //     cell_type = tokens[0]
-
-        //     tuple(cell_type, biorep, expr_type, bigwig_filename, file)
+            tuple(cell_type, biorep, expr_type, bigwig_filename, file)
 
             
-        //     }
-        //     .groupTuple(by:[0,1], sort:true)
-        //     .view{it -> "this is the chrmt bigwigs grouped by biorep: $it"}
-        //     .set{gloe_bigwig_tuple_cell_plc_for_ratio_ch}
+            }
+            .groupTuple(by:[0,1], sort:true)
+            .view{it -> "this is the chrmt bigwigs grouped by biorep: $it"}
+            .set{endseq_bigwig_tuple_cell_plc_for_ratio_ch}
 
         
-        // // then with this output to find the ratio between cells over plc only filter for cells and plc, then group channel by the first field
-        // // gb1 should then have the cell and plc for that tuple
-        // get_ratio_cell_vs_plc_bigwig_process(gloe_bigwig_tuple_cell_plc_for_ratio_ch)
+        // then with this output to find the ratio between cells over plc only filter for cells and plc, then group channel by the first field
+        // gb1 should then have the cell and plc for that tuple
+        get_endseq_ratio_cell_vs_plc_bigwig_process(endseq_bigwig_tuple_cell_plc_for_ratio_ch)
 
     
 
