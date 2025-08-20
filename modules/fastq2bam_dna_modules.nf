@@ -25,7 +25,7 @@ process fastp_SE_adapter_known {
     script:
 
     // getting the output name
-    out_name = "${fastq_names}_fp_filt.fastq"
+    out_name = "${fastq_names}.fp_filt.fastq"
 
 
     """
@@ -106,7 +106,7 @@ process fastp_SE {
     script:
 
     // getting the output name
-    out_name = "${fastq_names}_fp_filt.fastq"
+    out_name = "${fastq_names}.fp_filt.fastq"
 
 
     """
@@ -292,7 +292,7 @@ process bwa_meth_pe {
 
     script:
 
-    sam_name_out = "${filt_fastq_name}_filt_r1_r2.sam"
+    sam_name_out = "${filt_fastq_name}.filt_r1_r2.sam"
 
     """
     #!/usr/bin/env bash
@@ -1065,11 +1065,11 @@ process fastp_PE {
 
     script:
 
-    out_name_1 = "${fastq_name}_filt_R1_0.fastq"
-    out_name_2 = "${fastq_name}_filt_R2_0.fastq"
-    failed_reads_file = "${fastq_name}_failed_filter_reads.fastq"
-    merged_reads_file = "${fastq_name}_merged_file_reads.fastq"
-    html_file_name = "${fastq_name}_R1_R2_fastp.html"
+    out_name_1 = "${fastq_name}.filt_R1_0.fastq"
+    out_name_2 = "${fastq_name}.filt_R2_0.fastq"
+    failed_reads_file = "${fastq_name}.failed_filter_reads.fastq"
+    merged_reads_file = "${fastq_name}.merged_file_reads.fastq"
+    html_file_name = "${fastq_name}.R1_R2_fastp.html"
 
     """
     #!/usr/bin/env bash
@@ -1252,7 +1252,7 @@ process bwa_PE_aln {
     sai_out_file_r1 = "${filt_fastq_name}_filt_r1.sai"
     sai_out_file_r2 = "${filt_fastq_name}_filt_r2.sai"
 
-    out_sam_file = "${filt_fastq_name}_filt_r1_r2.sam"
+    out_sam_file = "${filt_fastq_name}.filt_r1_r2.sam"
 
 
     """
