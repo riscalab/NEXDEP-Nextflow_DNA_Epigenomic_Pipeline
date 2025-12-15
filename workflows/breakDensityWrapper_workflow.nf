@@ -19,7 +19,10 @@ include {
     get_ratio_cell_vs_plc_bigwig_process;
     gloe_celltypes_wrapper_scrm_process;
     endseq_celltypes_wrapper_process;
-    endseq_celltypes_wrapper_scrm_process
+    endseq_celltypes_wrapper_scrm_process;
+    make_bigwig_endseq_process;
+    get_ratio_cell_vs_plc_bigwig_process as get_endseq_ratio_cell_vs_plc_bigwig_process;
+    make_scrambled_peaks_process
 
 
 
@@ -231,6 +234,28 @@ workflow breakDensityWrapper_workflow {
 
 }
 
+// this will generate the scrambled peaks
+
+workflow generate_scrambled_peaks_workflow {
+
+
+    take:
+    rpe_peaks
+    blacklist_ch
+    mappa_scrm_ch
+
+
+
+    main:
+
+    // now I want to make a process that will run andrews scrambled scripts
+    make_scrambled_peaks_process(rpe_peaks.flatten(), blacklist_ch, mappa_scrm_ch)
+
+
+
+    //emit:
+}
+
 workflow breakDensityWrapper_Gloe_workflow {
 
     take:
@@ -238,11 +263,13 @@ workflow breakDensityWrapper_Gloe_workflow {
     peak_file_imr90
     peak_file_k562
     peak_file_BJ
+    peak_file_rpe1
 
     // scrambled peaks
     scrm_imr90_peaks
     scrm_k562_peaks
     scrm_bj_peaks
+    scrm_rpe1_peaks
 
 
     main:
@@ -268,7 +295,7 @@ workflow breakDensityWrapper_Gloe_workflow {
         .groupTuple(by:0, sort:true)
         .filter { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
 
-        cell_type in ['I', 'B', 'K']
+        cell_type in ['I', 'B', 'K', 'R']
 
         }
         .branch { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
@@ -276,6 +303,7 @@ workflow breakDensityWrapper_Gloe_workflow {
         imr90: cell_type == 'I'
         bj: cell_type == 'B'
         k562: cell_type == 'K'
+        rpe1: cell_type == 'R'
 
         }
         //.view() // reminder, we only have I(imr90), b(BJ), k(k562)
@@ -301,7 +329,11 @@ workflow breakDensityWrapper_Gloe_workflow {
 
         gloe_celltype.k562
             .combine(peak_file_k562.collect().toList())
-            .set{gleo_cell_k562_w_peak_ch}
+            .set{gloe_cell_k562_w_peak_ch}
+
+        gloe_celltype.rpe1
+            .combine(peak_file_rpe1.collect().toList())
+            .set{gloe_cell_rpe1_w_peak_ch}
 
         ///////////////////////////////////////////////////////////////////////////////
         // now doing the same but adding the scrambled peaks instead of the normal peaks
@@ -316,10 +348,14 @@ workflow breakDensityWrapper_Gloe_workflow {
 
         gloe_celltype.k562
             .combine(scrm_k562_peaks.collect().toList())
-            .set{gleo_cell_k562_w_scrm_peak_ch}
+            .set{gloe_cell_k562_w_scrm_peak_ch}
+
+        gloe_celltype.rpe1
+            .combine(scrm_rpe1_peaks.collect().toList())
+            .set{gloe_cell_rpe1_w_scrm_peak_ch}
 
         // then concate them like I did with the normal peaks below
-        gloe_celltypes_w_scrm_peak_concat = gloe_cell_imr90_w_scrm_peak_ch.concat(gloe_cell_bj_w_scrm_peak_ch, gleo_cell_k562_w_scrm_peak_ch )
+        gloe_celltypes_w_scrm_peak_concat = gloe_cell_imr90_w_scrm_peak_ch.concat(gloe_cell_bj_w_scrm_peak_ch, gloe_cell_k562_w_scrm_peak_ch, gloe_cell_rpe1_w_scrm_peak_ch )
 
         ///////////////////////////////////////////////////////////////////////////////
 
@@ -330,7 +366,7 @@ workflow breakDensityWrapper_Gloe_workflow {
         ///////////////////////////////////////////////////////////////////
         // I will create a test process that will take all three channels in parallel
         // first concatenate them
-        gloe_celltypes_w_peak_concat = gloe_cell_imr90_w_peak_ch.concat(gloe_cell_bj_w_peak_ch, gleo_cell_k562_w_peak_ch )
+        gloe_celltypes_w_peak_concat = gloe_cell_imr90_w_peak_ch.concat(gloe_cell_bj_w_peak_ch, gloe_cell_k562_w_peak_ch, gloe_cell_rpe1_w_peak_ch )
         // first check if it looks good
         gloe_celltypes_w_peak_concat.view(it -> "this is the concat channel with all three celltype tuples: $it")
         
@@ -402,11 +438,13 @@ workflow breakDensityWrapper_Endseq_workflow {
     peak_file_imr90
     peak_file_k562
     peak_file_BJ
+    peak_file_rpe1
 
     // scrambled peaks
     scrm_imr90_peaks
     scrm_k562_peaks
     scrm_bj_peaks
+    scrm_rpe1_peaks
 
 
     main:
@@ -434,7 +472,7 @@ workflow breakDensityWrapper_Endseq_workflow {
         .groupTuple(by:0, sort:true)
         .filter { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
 
-        cell_type in ['I', 'B', 'K']
+        cell_type in ['I', 'B', 'K', 'R']
 
         }
         .branch { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
@@ -442,6 +480,7 @@ workflow breakDensityWrapper_Endseq_workflow {
         imr90: cell_type == 'I'
         bj: cell_type == 'B'
         k562: cell_type == 'K'
+        rpe1: cell_type == 'R'
 
         }
         //.view() // reminder, we only have I(imr90), b(BJ), k(k562)
@@ -469,6 +508,10 @@ workflow breakDensityWrapper_Endseq_workflow {
             .combine(peak_file_k562.collect().toList())
             .set{endseq_cell_k562_w_peak_ch}
 
+        endseq_celltype.rpe1
+            .combine(peak_file_rpe1.collect().toList())
+            .set{endseq_cell_rpe1_w_peak_ch}
+
         ///////////////////////////////////////////////////////////////////////////////
         // now doing the same but adding the scrambled peaks instead of the normal peaks
         endseq_celltype.imr90
@@ -484,8 +527,12 @@ workflow breakDensityWrapper_Endseq_workflow {
             .combine(scrm_k562_peaks.collect().toList())
             .set{endseq_cell_k562_w_scrm_peak_ch}
 
+        endseq_celltype.rpe1
+            .combine(scrm_rpe1_peaks.collect().toList())
+            .set{endseq_cell_rpe1_w_scrm_peak_ch}
+
         // then concate them like I did with the normal peaks below
-        endseq_celltypes_w_scrm_peak_concat = endseq_cell_imr90_w_scrm_peak_ch.concat(endseq_cell_bj_w_scrm_peak_ch, endseq_cell_k562_w_scrm_peak_ch )
+        endseq_celltypes_w_scrm_peak_concat = endseq_cell_imr90_w_scrm_peak_ch.concat(endseq_cell_bj_w_scrm_peak_ch, endseq_cell_k562_w_scrm_peak_ch, endseq_cell_rpe1_w_scrm_peak_ch )
 
         ///////////////////////////////////////////////////////////////////////////////
 
@@ -496,7 +543,7 @@ workflow breakDensityWrapper_Endseq_workflow {
         ///////////////////////////////////////////////////////////////////
         // I will create a test process that will take all three channels in parallel
         // first concatenate them
-        endseq_celltypes_w_peak_concat = endseq_cell_imr90_w_peak_ch.concat(endseq_cell_bj_w_peak_ch, endseq_cell_k562_w_peak_ch )
+        endseq_celltypes_w_peak_concat = endseq_cell_imr90_w_peak_ch.concat(endseq_cell_bj_w_peak_ch, endseq_cell_k562_w_peak_ch, endseq_cell_rpe1_w_peak_ch )
         // first check if it looks good
         endseq_celltypes_w_peak_concat.view(it -> "this is the concat channel with all three celltype tuples for endseq: $it")
         
@@ -515,43 +562,45 @@ workflow breakDensityWrapper_Endseq_workflow {
 
         // i would need to filter the bam using samtools to get only read1 for gloe seq
         // HAVE TO FIND HOW TO DO THIS FOR END SEQ
+        // I DO NOT NEED TO FILTER FOR READ 1 HERE, because it is pair end and is only using one read
         // filt_gloe_bam_samtools_process(bam_index_tuple_ch)
         // r1_filt_gloe_bams = filt_gloe_bam_samtools_process.out.bam_filt_r1_gloe
         // //r1_filt_gloe_bams.view{it -> "these are the gloe bams index tuple that are filt by read1: $it"}
 
-        // //get the bigwig files from each of the bam files
-        // //make_bigwig_gloe_process(bam_index_tuple_ch)
-        // make_bigwig_gloe_process(r1_filt_gloe_bams)
+        //get the bigwig files from each of the bam files
+        //make_bigwig_gloe_process(bam_index_tuple_ch)
+        make_bigwig_endseq_process(bam_index_tuple_ch)
 
-        // // getting the chrmt bigwigs
-        // gloe_bigwig_chrmt_ch = make_bigwig_gloe_process.out.gloe_bigwig_mt
+        // getting the chrmt bigwigs
+        endseq_bigwig_chrmt_ch = make_bigwig_endseq_process.out.endseq_bigwig_mt
 
-        // // now to filter for only plc and cells
-        // gloe_bigwig_chrmt_ch
-        //     .filter(~/.*(?:Cell|PLC).*/)
-        //     .map{ file ->
+        // I HAVE TO CHANGE TOKENS HERE
+        // now to filter for only plc and cells
+        endseq_bigwig_chrmt_ch
+            .filter(~/.*(?:Cell|PLC).*/)
+            .map{ file ->
             
-        //     bigwig_basename = file.baseName
-        //     bigwig_filename = file.name
+            bigwig_basename = file.baseName
+            bigwig_filename = file.name
 
-        //     tokens = bigwig_basename.tokenize("_")
+            tokens = bigwig_basename.tokenize("_")
+    
+            biorep = tokens[3]  // was 1
+            expr_type = tokens[1] // was 2
+            cell_type = tokens[0] // was 0
 
-        //     biorep = tokens[1]
-        //     expr_type = tokens[2]
-        //     cell_type = tokens[0]
-
-        //     tuple(cell_type, biorep, expr_type, bigwig_filename, file)
+            tuple(cell_type, biorep, expr_type, bigwig_filename, file)
 
             
-        //     }
-        //     .groupTuple(by:[0,1], sort:true)
-        //     .view{it -> "this is the chrmt bigwigs grouped by biorep: $it"}
-        //     .set{gloe_bigwig_tuple_cell_plc_for_ratio_ch}
+            }
+            .groupTuple(by:[0,1], sort:true)
+            .view{it -> "this is the chrmt bigwigs grouped by biorep: $it"}
+            .set{endseq_bigwig_tuple_cell_plc_for_ratio_ch}
 
         
-        // // then with this output to find the ratio between cells over plc only filter for cells and plc, then group channel by the first field
-        // // gb1 should then have the cell and plc for that tuple
-        // get_ratio_cell_vs_plc_bigwig_process(gloe_bigwig_tuple_cell_plc_for_ratio_ch)
+        // then with this output to find the ratio between cells over plc only filter for cells and plc, then group channel by the first field
+        // gb1 should then have the cell and plc for that tuple
+        get_endseq_ratio_cell_vs_plc_bigwig_process(endseq_bigwig_tuple_cell_plc_for_ratio_ch)
 
     
 

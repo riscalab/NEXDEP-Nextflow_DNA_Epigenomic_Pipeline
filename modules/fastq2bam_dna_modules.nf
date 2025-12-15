@@ -25,7 +25,7 @@ process fastp_SE_adapter_known {
     script:
 
     // getting the output name
-    out_name = "${fastq_names}_fp_filt.fastq"
+    out_name = "${fastq_names}.fp_filt.fastq"
 
 
     """
@@ -106,7 +106,7 @@ process fastp_SE {
     script:
 
     // getting the output name
-    out_name = "${fastq_names}_fp_filt.fastq"
+    out_name = "${fastq_names}.fp_filt.fastq"
 
 
     """
@@ -292,7 +292,7 @@ process bwa_meth_pe {
 
     script:
 
-    sam_name_out = "${filt_fastq_name}_filt_r1_r2.sam"
+    sam_name_out = "${filt_fastq_name}.filt_r1_r2.sam"
 
     """
     #!/usr/bin/env bash
@@ -495,6 +495,8 @@ process bwa_align_SE {
 
 
 process samtools_sort {
+
+    errorStrategy 'ignore'
     // using the conda yml file for samtools
     // it doesnt work
     //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/samtools_rj_env.yml'
@@ -505,7 +507,7 @@ process samtools_sort {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
-
+    label 'normal_big_resources'
     // do not need to output these files either right now
     // if (!params.BL) {
     //     publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*_sorted.bam'
@@ -536,7 +538,9 @@ process samtools_sort {
     //tuple path("*.{bai,csi}"), emit: indexed_bams
     //tuple path("*.bai"), path("*.csi"), emit: indexed_bams
     path("*.bai"), emit: indexed_bams
-    tuple path("*_sorted.bam"), path("*.bai"), emit: bam_index_tuple
+    tuple path("${dup_bam}"), path("${dup_bam_index}"), emit: bam_index_tuple_for_stats
+
+    tuple path("${no_dup_sort_bam}"), path("${no_dup_sort_bai}"), emit: bam_index_tuple
 
     // path("*stats.log"), emit: flag_stats_log
     // path("*stats.txt"), emit: norm_stats_txt
@@ -554,7 +558,13 @@ process samtools_sort {
     // samtools_stats_log = "${sam_files.baseName}_stats.txt"
     // tsv_file_with_stats = "${sam_files.baseName}_SN_stats.tsv"
 
+    dup_bam = "${sam_files.baseName}.dup.bam"
+    dup_bam_index = "${sam_files.baseName}.dup.bam.bai"
 
+    no_dup_bam = "${sam_files.baseName}.NOdup.bam"
+
+    no_dup_sort_bam = "${sam_files.baseName}.NOdup.coor.sorted.bam"
+    no_dup_sort_bai = "${sam_files.baseName}.NOdup.coor.sorted.bam.bai"
     
 
     """
@@ -621,6 +631,25 @@ process samtools_sort {
     -O bam \
     "${out_bam_fixmate}"
 
+
+    # Step 4: Mark duplicates (without removing them)
+    samtools markdup "${out_bam_coor_sort}" "${dup_bam}"
+
+    # Step 5: Index final BAM
+    # I need to output this dup_bam and send it to the bam_log_calc process
+    samtools index "${dup_bam}"
+
+    # now to remove the duplicates
+    samtools markdup -r "${dup_bam}" "${no_dup_bam}"
+
+    # then sort and index no_dup_bam to use as input to all other processes
+    samtools sort -o "${no_dup_sort_bam}" -O bam "${no_dup_bam}"
+
+    # then index the no dup sort bam
+
+    samtools index -b "${no_dup_sort_bam}"
+
+
     # removed this from above because it messes with samtools markdup: -t RG \
 
 
@@ -633,9 +662,9 @@ process samtools_sort {
     #"\${out_bam_final}"
 
     # so i will just use the out file from the coordinate sort samtools sort section instead of using out_bam_final
-    samtools index \
+    #samtools index \
     -b \
-    "${out_bam_coor_sort}"
+    "\${out_bam_coor_sort}"
 
     #samtools flagstat \
     #"\${out_bam_coor_sort}" \
@@ -940,7 +969,7 @@ process bedtools_filt_blacklist {
     // dont need to publish this since the samtools_bl_index will publish the sorted 2 version of the bam
     //publishDir "${params.base_out_dir}/blacklist_filt_bam", mode: 'copy', pattern: '*.bam'
     
-    
+    label 'normal_big_resources'
 
     input:
 
@@ -1065,11 +1094,11 @@ process fastp_PE {
 
     script:
 
-    out_name_1 = "${fastq_name}_filt_R1_0.fastq"
-    out_name_2 = "${fastq_name}_filt_R2_0.fastq"
-    failed_reads_file = "${fastq_name}_failed_filter_reads.fastq"
-    merged_reads_file = "${fastq_name}_merged_file_reads.fastq"
-    html_file_name = "${fastq_name}_R1_R2_fastp.html"
+    out_name_1 = "${fastq_name}.filt_R1_0.fastq"
+    out_name_2 = "${fastq_name}.filt_R2_0.fastq"
+    failed_reads_file = "${fastq_name}.failed_filter_reads.fastq"
+    merged_reads_file = "${fastq_name}.merged_file_reads.fastq"
+    html_file_name = "${fastq_name}.R1_R2_fastp.html"
 
     """
     #!/usr/bin/env bash
@@ -1252,7 +1281,7 @@ process bwa_PE_aln {
     sai_out_file_r1 = "${filt_fastq_name}_filt_r1.sai"
     sai_out_file_r2 = "${filt_fastq_name}_filt_r2.sai"
 
-    out_sam_file = "${filt_fastq_name}_filt_r1_r2.sam"
+    out_sam_file = "${filt_fastq_name}.filt_r1_r2.sam"
 
 
     """
@@ -2183,7 +2212,7 @@ process get_ratio_cell_vs_plc_bigwig_process {
 
     label 'normal_small_resources'
 
-    publishDir "${params.base_out_dir}/gloe_seq_bigwigs/ratio_bigwigs", mode: 'copy', pattern: '*'
+    publishDir "${params.base_out_dir}/${params.expr_type}_bigwigs/ratio_bigwigs", mode: 'copy', pattern: '*'
 
 
 
@@ -2202,6 +2231,7 @@ process get_ratio_cell_vs_plc_bigwig_process {
 
 
     script:
+
 
     cell_label = cell_plc_label[0]
     plc_label = cell_plc_label[1]
@@ -2226,6 +2256,52 @@ process get_ratio_cell_vs_plc_bigwig_process {
     --outFileName "${output_name}" \
     --outFileFormat "bigwig"
 
+
+
+
+
+    """
+}
+
+
+// need to just get bigwig files of each bam file from end seq
+process make_bigwig_endseq_process {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/deeptools_rj'
+
+    label 'normal_big_resources'
+
+    publishDir "${params.base_out_dir}/${params.expr_type}_bigwigs", mode: 'copy', pattern:'*'
+
+
+    input:
+
+    tuple path(bam), path(bam_index)
+
+    
+
+
+    output:
+
+    path("${base_bam_name}"), emit: endseq_bigwig_mt
+
+
+    script:
+    base_bam_name = "${bam.baseName}.chrMT.bigwig"
+
+    """
+    #!/usr/bin/env bash
+
+    # because this is end seq, we should find the first position of read 1 so the 5' end
+    bamCoverage \
+    --bam ${bam} \
+    --normalizeUsing RPGC \
+    --region chrMT \
+    --Offset 1 \
+    --binSize 1 \
+    --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
+    --outFileName "${base_bam_name}" \
+    --outFileFormat "bigwig"
 
 
 
@@ -2299,6 +2375,67 @@ process break_concat_results {
 }
 
 
+process make_scrambled_peaks_process {
+
+    publishDir "${params.base_out_dir}/scrambled_generated_peaks", mode: 'copy', pattern: "*"
+
+    debug true
+    //cache false
+    //errorStrategy 'ignore'
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    label 'normal_big_resources'
+
+    input:
+
+    path(peak_files)
+    path(blacklist)
+    path(mappa_scrm_file)
+
+
+
+    output:
+
+    path("*.chunked.bed"), emit: test_scrambled_peaks
+    path("*.filtered.bed"), emit: filtered_scrm_beds
+
+
+
+    script:
+
+
+
+
+    """
+    #!/usr/bin/env bash
+
+    # running andrews scripts
+
+    #echo "these are the rpe peaks \${peak_files.join(' ')}"
+
+    #GenerateManyNullSeqs.sh \${peak_files.join(' ')}
+
+    # I flattened the channel to parallel this so a process is created for each rpe peak or any cell line peaks in the future
+    
+    echo "these are the rpe peaks ${peak_files}"
+
+    GenerateManyNullSeqs.sh ${peak_files}
+
+    # now need to filter the .chunked.bed scrambled peak file
+    # will create a .filtered.bed file
+    
+    FilterPeaksAndScramblesV4.sh "${peak_files}.chunked.bed" "Null_Range_${peak_files}.chunked.bed" "${blacklist}" "${mappa_scrm_file}"
+
+
+
+
+
+
+    """
+}
+
+
 process py_calc_stats_log {
 
     //debug true
@@ -2318,7 +2455,7 @@ process py_calc_stats_log {
 
     output:
 
-    path("bam_*.tsv"), emit: pe_tsv_log
+    path("*bam*.tsv"), emit: pe_tsv_log
     path("*stats.txt")
     path("*stats.html")
     
@@ -2332,7 +2469,11 @@ process py_calc_stats_log {
     name_of_file = "${tsv_names}"
     //pe_log_file_out = "pe_bam_stats_log.tsv"
     //se_log_file_out = "se_bam_stats_log.tsv"
-    log_file_out = "bam_stats_log.tsv"
+    log_file_out = "${params.expr_type}_bam_stats_log.tsv"
+
+    html_out_file = "${params.expr_type}_table_bam_stats.html"
+
+    txt_out_file = "${params.expr_type}_table_pipe_stats.txt"
 
     """
     #!/usr/bin/env python
@@ -2405,11 +2546,11 @@ process py_calc_stats_log {
 
     table_html = tabulate(data, headers = data.columns.to_list(), tablefmt = 'html')
 
-    file_pipe = open('table_pipe_stats.txt', 'w')
+    file_pipe = open("${txt_out_file}", 'w')
     file_pipe.write(table_pipe)
     file_pipe.close()
 
-    file_html = open('table_bam_stats.html','w')
+    file_html = open("${html_out_file}",'w')
     file_html.write(table_html)
     file_html.close()
 

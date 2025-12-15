@@ -81,7 +81,12 @@ conda activate nextflow_three
 # --num_effectiveGenomeSize '2864785220' \
 # --BL \
 # --end_seq \
+# --spike_in \
+# --t7 \
+# --lambda \
 # --calc_break_density
+
+
 
 # --spike_in \
 # --t7 \
@@ -118,8 +123,7 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 --num_effectiveGenomeSize '2864785220' \
 --depth_intersection \
 --gloe_seq \
---spike_in \
---lambda 
+--calc_break_density
 
 # dont use --calc_break_density when getting the spike in stuff
 
