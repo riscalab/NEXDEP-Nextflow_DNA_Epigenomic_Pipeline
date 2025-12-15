@@ -72,19 +72,19 @@ conda activate nextflow_three
 
 
 ###################### FOR END SEQ ###############################################
-nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
--resume \
---SE \
---single_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_ENDseq_Novaseq_010925/read1_fastqs/*_1.fastq.gz' \
---ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
---use_effectiveGenomeSize \
---num_effectiveGenomeSize '2864785220' \
---BL \
---end_seq \
---spike_in \
---t7 \
---lambda \
---calc_break_density
+# nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+# -resume \
+# --SE \
+# --single_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_ENDseq_Novaseq_010925/read1_fastqs/*_1.fastq.gz' \
+# --ada_seq --adapter_seq_str 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' \
+# --use_effectiveGenomeSize \
+# --num_effectiveGenomeSize '2864785220' \
+# --BL \
+# --end_seq \
+# --spike_in \
+# --t7 \
+# --lambda \
+# --calc_break_density
 
 
 
@@ -114,18 +114,16 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 
 
 ##################### For GLOE seq data ##########################################
-# nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
-# -resume \
-# --PE \
-# --BL \
-# --paired_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*' \
-# --use_effectiveGenomeSize \
-# --num_effectiveGenomeSize '2864785220' \
-# --depth_intersection \
-# --gloe_seq \
-# --spike_in \
-# --lambda \
-# --t7
+nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+-resume \
+--PE \
+--BL \
+--paired_end_reads '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*' \
+--use_effectiveGenomeSize \
+--num_effectiveGenomeSize '2864785220' \
+--depth_intersection \
+--gloe_seq \
+--calc_break_density
 
 # dont use --calc_break_density when getting the spike in stuff
 

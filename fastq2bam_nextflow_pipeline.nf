@@ -58,7 +58,8 @@ include {
     breakDensityWrapper_workflow;
     breakDensityWrapper_Gloe_workflow;
     breakDensityWrapper_spike_in_workflow;
-    breakDensityWrapper_Endseq_workflow
+    breakDensityWrapper_Endseq_workflow;
+    generate_scrambled_peaks_workflow
 
 
 } from './workflows/breakDensityWrapper_workflow.nf'
@@ -134,6 +135,10 @@ workflow {
     params.blacklist_path = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg19/blacklist/hg19-blacklist.v2.bed')
                 
     blacklist_ch = Channel.value(params.blacklist_path)
+
+    // mappability for the generating scrambled peaks
+    params.mappa_scrm = file('/lustre/fs4/home/ascortea/store/ascortea/beds/UMAP_Mappability_hg19/36.Unconverted.bed')
+    mappa_scrm_ch = Channel.value(params.mappa_scrm)
 
     // i want to add an if then logic to the pipeline so i know which type of reads are comming in paired end or single end
 
@@ -307,6 +312,7 @@ workflow {
             sorted_bams_ch = samtools_sort.out.sorted_bams
             indexed_bams_ch = samtools_sort.out.indexed_bams
             bam_index_tuple_ch = samtools_sort.out.bam_index_tuple
+            bam_index_tuple_for_stats_ch = samtools_sort.out.bam_index_tuple_for_stats
             // flagstat_log_ch = samtools_sort.out.flag_stats_log.collect() // will make another process or send this to the multiqc process
             // norm_stats_txt_ch = samtools_sort.out.norm_stats_txt.collect()
             // tsv_SN_stats_ch = samtools_sort.out.tsv_SN_stats.collect()
@@ -531,6 +537,7 @@ workflow {
             //samtools_sort.out.bam_index_tuple.view()
 
             bam_index_tuple_ch = samtools_sort.out.bam_index_tuple
+            bam_index_tuple_for_stats_ch = samtools_sort.out.bam_index_tuple_for_stats
             // flagstat_log_ch = samtools_sort.out.flag_stats_log.collect() // will make another process or send this to the multiqc process
             // norm_stats_txt_ch = samtools_sort.out.norm_stats_txt.collect()
             // tsv_SN_stats_ch = samtools_sort.out.tsv_SN_stats.collect()
@@ -613,6 +620,7 @@ workflow {
             // tsv_SN_stats_ch = samtools_sort.out.tsv_SN_stats.collect()
 
             bam_index_tuple_ch = samtools_sort.out.bam_index_tuple
+            bam_index_tuple_for_stats_ch = samtools_sort.out.bam_index_tuple_for_stats
             
 
             // add the if logic for ATAC here
@@ -777,6 +785,9 @@ workflow {
 
     if (params.give_peak_files == null) {
 
+        // we do not have scrambled peaks or peaks for RPE1 cell line, so I got some normal peaks from geo
+        params.peak_files_RPE1 = files('/lustre/fs4/home/rjohnson/pipelines/hera_pipeline/rpe_geo_peaks/*.test.bed')
+        peak_file_rpe1 = Channel.fromPath(params.peak_files_RPE1)
 
         // I want to have a parameter that takes peakfiles. The default will be the IMR90 narrowPeak files
         //params.peak_files_IMR90 = files('/lustre/fs4/home/ascortea/store/ascortea/beds/IMR90/*.narrowPeak')
@@ -796,10 +807,11 @@ workflow {
         peak_file_k562 = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/*.gappedPeak')
         //peak_file_BJ = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/*minimal*.gappedPeak')
 
+
         //E055-DNase.macs2.narrowPeak causing problems
         // wondering if i can do this
         //all_peaks_ch = peak_file_imr90.concat(peak_file_HUVEC, peak_file_k562, peak_file_BJ)
-        all_peaks_ch = peak_file_imr90.concat(peak_file_k562, peak_file_BJ)
+        all_peaks_ch = peak_file_imr90.concat(peak_file_k562, peak_file_BJ, peak_file_rpe1)
 
         // ANDREW ONLY HAS SCRAMBLED PEAKS FOR GAPPED PEAKS NOT NARROW. so i will just implement his script for generageing scrambled peaks
         // now getting the scrambled peaks from andrews directory, not making a process to use his scripts to generate them yet
@@ -810,6 +822,9 @@ workflow {
         // do not need to make a params, just use channel frompath
         scrm_k562_peaks = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/k562/20230511_scrambled_filtered/*filtered.bed')
         scrm_bj_peaks = Channel.fromPath('/lustre/fs4/home/ascortea/store/ascortea/beds/BJ/Filtered_Beds_narrowpeaks_20230307/*filtered.bed')
+
+        // i used the pipeline to generate scrambled peaks. but have to use the params.make_scrambled_peaks to do so now.
+        scrm_rpe1_peaks = Channel.fromPath('/lustre/fs4/home/rjohnson/pipelines/hera_pipeline/rpe_geo_peaks/scrambled_geo_RPE_peaks/*.filtered.bed')
 
 
 
@@ -993,7 +1008,7 @@ workflow {
                                                 pe_yeast_bam_index_tuple_ch
         )
 
-        all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(pe_t7_bam_index_tuple_ch,
+        all_spike_bam_index_tuple_ch = bam_index_tuple_for_stats_ch.concat(pe_t7_bam_index_tuple_ch,
                                                 pe_lambda_bam_index_tuple_ch, 
                                                 pe_yeast_bam_index_tuple_ch
         )
@@ -1017,7 +1032,7 @@ workflow {
                                                 se_yeast_bam_index_tuple_ch
         )
 
-        all_spike_bam_index_tuple_ch = bam_index_tuple_ch.concat(
+        all_spike_bam_index_tuple_ch = bam_index_tuple_for_stats_ch.concat(
                                                 only_spike_bam_index_tuple_ch
         )
         
@@ -1150,6 +1165,12 @@ workflow {
 
     if (params.calc_break_density){
 
+        // make scrambled RPE peaks here so I can put those and the normal RPE peaks into the density wrapper workflows below
+        // this will be a process that can just make scrambled peaks for any cell line
+        //peak_file_rpe1.view()
+        if (params.make_scrambled_peaks){
+            generate_scrambled_peaks_workflow(peak_file_rpe1.collect(), blacklist_ch, mappa_scrm_ch)
+        }
         // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
         //breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
         
@@ -1165,7 +1186,7 @@ workflow {
         //breakDensityWrapper_Gloe_workflow(bam_index_tuple_ch.take(5), peak_file_imr90.take(5), peak_file_k562.take(5), peak_file_BJ.take(5))
         if (params.PE) {
             // pair end data is the gloe seq data 
-            breakDensityWrapper_Gloe_workflow(bam_index_tuple_ch, peak_file_imr90, peak_file_k562, peak_file_BJ, scrm_imr90_peaks, scrm_k562_peaks, scrm_bj_peaks)
+            breakDensityWrapper_Gloe_workflow(bam_index_tuple_ch, peak_file_imr90, peak_file_k562, peak_file_BJ, peak_file_rpe1, scrm_imr90_peaks, scrm_k562_peaks, scrm_bj_peaks, scrm_rpe1_peaks)
         }
     
         // to make it easy for now, just make identical workflows that take the correct cell type and then use only the right peak type in that workflow
@@ -1174,7 +1195,7 @@ workflow {
         if (params.SE) {
 
             // single end data is the end seq data
-            breakDensityWrapper_Endseq_workflow(bam_index_tuple_ch, peak_file_imr90, peak_file_k562, peak_file_BJ, scrm_imr90_peaks, scrm_k562_peaks, scrm_bj_peaks)
+            breakDensityWrapper_Endseq_workflow(bam_index_tuple_ch, peak_file_imr90, peak_file_k562, peak_file_BJ, peak_file_rpe1, scrm_imr90_peaks, scrm_k562_peaks, scrm_bj_peaks, scrm_rpe1_peaks)
 
 
         }

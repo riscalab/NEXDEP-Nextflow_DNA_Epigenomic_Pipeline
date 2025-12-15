@@ -21,7 +21,8 @@ include {
     endseq_celltypes_wrapper_process;
     endseq_celltypes_wrapper_scrm_process;
     make_bigwig_endseq_process;
-    get_ratio_cell_vs_plc_bigwig_process as get_endseq_ratio_cell_vs_plc_bigwig_process
+    get_ratio_cell_vs_plc_bigwig_process as get_endseq_ratio_cell_vs_plc_bigwig_process;
+    make_scrambled_peaks_process
 
 
 
@@ -233,6 +234,28 @@ workflow breakDensityWrapper_workflow {
 
 }
 
+// this will generate the scrambled peaks
+
+workflow generate_scrambled_peaks_workflow {
+
+
+    take:
+    rpe_peaks
+    blacklist_ch
+    mappa_scrm_ch
+
+
+
+    main:
+
+    // now I want to make a process that will run andrews scrambled scripts
+    make_scrambled_peaks_process(rpe_peaks.flatten(), blacklist_ch, mappa_scrm_ch)
+
+
+
+    //emit:
+}
+
 workflow breakDensityWrapper_Gloe_workflow {
 
     take:
@@ -240,11 +263,13 @@ workflow breakDensityWrapper_Gloe_workflow {
     peak_file_imr90
     peak_file_k562
     peak_file_BJ
+    peak_file_rpe1
 
     // scrambled peaks
     scrm_imr90_peaks
     scrm_k562_peaks
     scrm_bj_peaks
+    scrm_rpe1_peaks
 
 
     main:
@@ -270,7 +295,7 @@ workflow breakDensityWrapper_Gloe_workflow {
         .groupTuple(by:0, sort:true)
         .filter { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
 
-        cell_type in ['I', 'B', 'K']
+        cell_type in ['I', 'B', 'K', 'R']
 
         }
         .branch { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
@@ -278,6 +303,7 @@ workflow breakDensityWrapper_Gloe_workflow {
         imr90: cell_type == 'I'
         bj: cell_type == 'B'
         k562: cell_type == 'K'
+        rpe1: cell_type == 'R'
 
         }
         //.view() // reminder, we only have I(imr90), b(BJ), k(k562)
@@ -303,7 +329,11 @@ workflow breakDensityWrapper_Gloe_workflow {
 
         gloe_celltype.k562
             .combine(peak_file_k562.collect().toList())
-            .set{gleo_cell_k562_w_peak_ch}
+            .set{gloe_cell_k562_w_peak_ch}
+
+        gloe_celltype.rpe1
+            .combine(peak_file_rpe1.collect().toList())
+            .set{gloe_cell_rpe1_w_peak_ch}
 
         ///////////////////////////////////////////////////////////////////////////////
         // now doing the same but adding the scrambled peaks instead of the normal peaks
@@ -318,10 +348,14 @@ workflow breakDensityWrapper_Gloe_workflow {
 
         gloe_celltype.k562
             .combine(scrm_k562_peaks.collect().toList())
-            .set{gleo_cell_k562_w_scrm_peak_ch}
+            .set{gloe_cell_k562_w_scrm_peak_ch}
+
+        gloe_celltype.rpe1
+            .combine(scrm_rpe1_peaks.collect().toList())
+            .set{gloe_cell_rpe1_w_scrm_peak_ch}
 
         // then concate them like I did with the normal peaks below
-        gloe_celltypes_w_scrm_peak_concat = gloe_cell_imr90_w_scrm_peak_ch.concat(gloe_cell_bj_w_scrm_peak_ch, gleo_cell_k562_w_scrm_peak_ch )
+        gloe_celltypes_w_scrm_peak_concat = gloe_cell_imr90_w_scrm_peak_ch.concat(gloe_cell_bj_w_scrm_peak_ch, gloe_cell_k562_w_scrm_peak_ch, gloe_cell_rpe1_w_scrm_peak_ch )
 
         ///////////////////////////////////////////////////////////////////////////////
 
@@ -332,7 +366,7 @@ workflow breakDensityWrapper_Gloe_workflow {
         ///////////////////////////////////////////////////////////////////
         // I will create a test process that will take all three channels in parallel
         // first concatenate them
-        gloe_celltypes_w_peak_concat = gloe_cell_imr90_w_peak_ch.concat(gloe_cell_bj_w_peak_ch, gleo_cell_k562_w_peak_ch )
+        gloe_celltypes_w_peak_concat = gloe_cell_imr90_w_peak_ch.concat(gloe_cell_bj_w_peak_ch, gloe_cell_k562_w_peak_ch, gloe_cell_rpe1_w_peak_ch )
         // first check if it looks good
         gloe_celltypes_w_peak_concat.view(it -> "this is the concat channel with all three celltype tuples: $it")
         
@@ -404,11 +438,13 @@ workflow breakDensityWrapper_Endseq_workflow {
     peak_file_imr90
     peak_file_k562
     peak_file_BJ
+    peak_file_rpe1
 
     // scrambled peaks
     scrm_imr90_peaks
     scrm_k562_peaks
     scrm_bj_peaks
+    scrm_rpe1_peaks
 
 
     main:
@@ -436,7 +472,7 @@ workflow breakDensityWrapper_Endseq_workflow {
         .groupTuple(by:0, sort:true)
         .filter { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
 
-        cell_type in ['I', 'B', 'K']
+        cell_type in ['I', 'B', 'K', 'R']
 
         }
         .branch { cell_type, biorep_type, expr_type, bam_filename, bam, bai ->
@@ -444,6 +480,7 @@ workflow breakDensityWrapper_Endseq_workflow {
         imr90: cell_type == 'I'
         bj: cell_type == 'B'
         k562: cell_type == 'K'
+        rpe1: cell_type == 'R'
 
         }
         //.view() // reminder, we only have I(imr90), b(BJ), k(k562)
@@ -471,6 +508,10 @@ workflow breakDensityWrapper_Endseq_workflow {
             .combine(peak_file_k562.collect().toList())
             .set{endseq_cell_k562_w_peak_ch}
 
+        endseq_celltype.rpe1
+            .combine(peak_file_rpe1.collect().toList())
+            .set{endseq_cell_rpe1_w_peak_ch}
+
         ///////////////////////////////////////////////////////////////////////////////
         // now doing the same but adding the scrambled peaks instead of the normal peaks
         endseq_celltype.imr90
@@ -486,8 +527,12 @@ workflow breakDensityWrapper_Endseq_workflow {
             .combine(scrm_k562_peaks.collect().toList())
             .set{endseq_cell_k562_w_scrm_peak_ch}
 
+        endseq_celltype.rpe1
+            .combine(scrm_rpe1_peaks.collect().toList())
+            .set{endseq_cell_rpe1_w_scrm_peak_ch}
+
         // then concate them like I did with the normal peaks below
-        endseq_celltypes_w_scrm_peak_concat = endseq_cell_imr90_w_scrm_peak_ch.concat(endseq_cell_bj_w_scrm_peak_ch, endseq_cell_k562_w_scrm_peak_ch )
+        endseq_celltypes_w_scrm_peak_concat = endseq_cell_imr90_w_scrm_peak_ch.concat(endseq_cell_bj_w_scrm_peak_ch, endseq_cell_k562_w_scrm_peak_ch, endseq_cell_rpe1_w_scrm_peak_ch )
 
         ///////////////////////////////////////////////////////////////////////////////
 
@@ -498,7 +543,7 @@ workflow breakDensityWrapper_Endseq_workflow {
         ///////////////////////////////////////////////////////////////////
         // I will create a test process that will take all three channels in parallel
         // first concatenate them
-        endseq_celltypes_w_peak_concat = endseq_cell_imr90_w_peak_ch.concat(endseq_cell_bj_w_peak_ch, endseq_cell_k562_w_peak_ch )
+        endseq_celltypes_w_peak_concat = endseq_cell_imr90_w_peak_ch.concat(endseq_cell_bj_w_peak_ch, endseq_cell_k562_w_peak_ch, endseq_cell_rpe1_w_peak_ch )
         // first check if it looks good
         endseq_celltypes_w_peak_concat.view(it -> "this is the concat channel with all three celltype tuples for endseq: $it")
         

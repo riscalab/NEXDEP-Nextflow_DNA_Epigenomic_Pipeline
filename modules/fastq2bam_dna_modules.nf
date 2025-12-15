@@ -495,6 +495,8 @@ process bwa_align_SE {
 
 
 process samtools_sort {
+
+    errorStrategy 'ignore'
     // using the conda yml file for samtools
     // it doesnt work
     //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/samtools_rj_env.yml'
@@ -505,7 +507,7 @@ process samtools_sort {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
 
-
+    label 'normal_big_resources'
     // do not need to output these files either right now
     // if (!params.BL) {
     //     publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*_sorted.bam'
@@ -536,7 +538,9 @@ process samtools_sort {
     //tuple path("*.{bai,csi}"), emit: indexed_bams
     //tuple path("*.bai"), path("*.csi"), emit: indexed_bams
     path("*.bai"), emit: indexed_bams
-    tuple path("*_sorted.bam"), path("*.bai"), emit: bam_index_tuple
+    tuple path("${dup_bam}"), path("${dup_bam_index}"), emit: bam_index_tuple_for_stats
+
+    tuple path("${no_dup_sort_bam}"), path("${no_dup_sort_bai}"), emit: bam_index_tuple
 
     // path("*stats.log"), emit: flag_stats_log
     // path("*stats.txt"), emit: norm_stats_txt
@@ -554,7 +558,13 @@ process samtools_sort {
     // samtools_stats_log = "${sam_files.baseName}_stats.txt"
     // tsv_file_with_stats = "${sam_files.baseName}_SN_stats.tsv"
 
+    dup_bam = "${sam_files.baseName}.dup.bam"
+    dup_bam_index = "${sam_files.baseName}.dup.bam.bai"
 
+    no_dup_bam = "${sam_files.baseName}.NOdup.bam"
+
+    no_dup_sort_bam = "${sam_files.baseName}.NOdup.coor.sorted.bam"
+    no_dup_sort_bai = "${sam_files.baseName}.NOdup.coor.sorted.bam.bai"
     
 
     """
@@ -621,6 +631,25 @@ process samtools_sort {
     -O bam \
     "${out_bam_fixmate}"
 
+
+    # Step 4: Mark duplicates (without removing them)
+    samtools markdup "${out_bam_coor_sort}" "${dup_bam}"
+
+    # Step 5: Index final BAM
+    # I need to output this dup_bam and send it to the bam_log_calc process
+    samtools index "${dup_bam}"
+
+    # now to remove the duplicates
+    samtools markdup -r "${dup_bam}" "${no_dup_bam}"
+
+    # then sort and index no_dup_bam to use as input to all other processes
+    samtools sort -o "${no_dup_sort_bam}" -O bam "${no_dup_bam}"
+
+    # then index the no dup sort bam
+
+    samtools index -b "${no_dup_sort_bam}"
+
+
     # removed this from above because it messes with samtools markdup: -t RG \
 
 
@@ -633,9 +662,9 @@ process samtools_sort {
     #"\${out_bam_final}"
 
     # so i will just use the out file from the coordinate sort samtools sort section instead of using out_bam_final
-    samtools index \
+    #samtools index \
     -b \
-    "${out_bam_coor_sort}"
+    "\${out_bam_coor_sort}"
 
     #samtools flagstat \
     #"\${out_bam_coor_sort}" \
@@ -940,7 +969,7 @@ process bedtools_filt_blacklist {
     // dont need to publish this since the samtools_bl_index will publish the sorted 2 version of the bam
     //publishDir "${params.base_out_dir}/blacklist_filt_bam", mode: 'copy', pattern: '*.bam'
     
-    
+    label 'normal_big_resources'
 
     input:
 
@@ -2342,6 +2371,67 @@ process break_concat_results {
 
 
     
+    """
+}
+
+
+process make_scrambled_peaks_process {
+
+    publishDir "${params.base_out_dir}/scrambled_generated_peaks", mode: 'copy', pattern: "*"
+
+    debug true
+    //cache false
+    //errorStrategy 'ignore'
+
+    conda '/ru-auth/local/home/risc_soft/miniconda3/envs/fastq2bam'
+
+    label 'normal_big_resources'
+
+    input:
+
+    path(peak_files)
+    path(blacklist)
+    path(mappa_scrm_file)
+
+
+
+    output:
+
+    path("*.chunked.bed"), emit: test_scrambled_peaks
+    path("*.filtered.bed"), emit: filtered_scrm_beds
+
+
+
+    script:
+
+
+
+
+    """
+    #!/usr/bin/env bash
+
+    # running andrews scripts
+
+    #echo "these are the rpe peaks \${peak_files.join(' ')}"
+
+    #GenerateManyNullSeqs.sh \${peak_files.join(' ')}
+
+    # I flattened the channel to parallel this so a process is created for each rpe peak or any cell line peaks in the future
+    
+    echo "these are the rpe peaks ${peak_files}"
+
+    GenerateManyNullSeqs.sh ${peak_files}
+
+    # now need to filter the .chunked.bed scrambled peak file
+    # will create a .filtered.bed file
+    
+    FilterPeaksAndScramblesV4.sh "${peak_files}.chunked.bed" "Null_Range_${peak_files}.chunked.bed" "${blacklist}" "${mappa_scrm_file}"
+
+
+
+
+
+
     """
 }
 
