@@ -10,8 +10,9 @@ You can find the most recent versions of how I ran the pipeline myself in these 
 
 run_bed2heatmap_main_pipeline.sh
 run_fastq2bam_nf_pipeline.sh
+run_fastq2bam_hera_cuttag_data.sh
 
-The second one is the template to use when you want to align your fastq data and get bam files
+The third one is the template to use when you want to align your fastq data and get bam files
 
 ```
 
