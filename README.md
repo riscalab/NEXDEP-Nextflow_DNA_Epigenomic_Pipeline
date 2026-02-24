@@ -86,6 +86,14 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 
 # Parameters Section
 
+**Not required but good to put**
+```
+This will put the string that you write at the start of the file name for the table that calculates read depth of experiment
+
+--expr_type : a short string that descirbes your experiment EX: cutntag_h3k27me3_HC
+
+```
+
 **Parameters for Pair-End Data**
 
 ```
