@@ -94,6 +94,23 @@ This will put the string that you write at the start of the file name for the ta
 
 ```
 
+**Parameters for making bigwigs and bedgraphs using deeptools bed_coverage**
+```
+Use these to set the normalization method deeptools will use for both bigwig and bedgraph
+--cpm_bigwig
+--rpgc_bigwig
+--rpkm_bigwig 
+--bpm_bigwig
+
+Use this to set the bin size deeptools will use
+--bam_cov_binSize : default is '100'
+
+Use this to set the scaling factor
+--bam_cov_scaleFactor: default is '1'
+
+
+```
+
 **Parameters for Pair-End Data**
 
 ```
