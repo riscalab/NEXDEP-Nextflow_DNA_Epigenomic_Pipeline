@@ -836,7 +836,7 @@ process deeptools_make_bed {
             #################################################
 
 
-            bamCoverage \
+            bamCoverage ${params.extend_reads_deeptools} \
             --bam "${bams}" \
             --outFileName "${out_bed_name}" \
             --outFileFormat "bedgraph" \
@@ -846,7 +846,7 @@ process deeptools_make_bed {
             --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
             --skipNonCoveredRegions
 
-            bamCoverage \
+            bamCoverage ${params.extend_reads_deeptools} \
             --bam "${bams}" \
             --outFileName "${out_bigwig_name}" \
             --outFileFormat "bigwig" \
@@ -864,7 +864,7 @@ process deeptools_make_bed {
 
             """
 
-            bamCoverage \
+            bamCoverage ${params.extend_reads_deeptools} \
             --bam "${bams}" \
             --outFileName "${out_bed_name}" \
             --outFileFormat "bedgraph" \
@@ -873,7 +873,7 @@ process deeptools_make_bed {
             --normalizeUsing ${normalize_bigwig_opt} \
             --skipNonCoveredRegions
 
-            bamCoverage \
+            bamCoverage ${params.extend_reads_deeptools} \
             --bam "${bams}" \
             --outFileName "${out_bigwig_name}" \
             --outFileFormat "bigwig" \
@@ -910,7 +910,7 @@ process deeptools_make_bed {
         #################################################
 
 
-        bamCoverage \
+        bamCoverage ${params.extend_reads_deeptools} \
         --bam "${bams}" \
         --outFileName "${out_bed_name}" \
         --outFileFormat "bedgraph" \
@@ -920,7 +920,7 @@ process deeptools_make_bed {
         --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
         --skipNonCoveredRegions
 
-        bamCoverage \
+        bamCoverage ${params.extend_reads_deeptools} \
         --bam "${bams}" \
         --outFileName "${out_bigwig_name}" \
         --outFileFormat "bigwig" \
@@ -938,7 +938,7 @@ process deeptools_make_bed {
 
         """
 
-        bamCoverage \
+        bamCoverage ${params.extend_reads_deeptools} \
         --bam "${bams}" \
         --outFileName "${out_bed_name}" \
         --outFileFormat "bedgraph" \
@@ -947,7 +947,7 @@ process deeptools_make_bed {
         --normalizeUsing ${normalize_bigwig_opt} \
         --skipNonCoveredRegions
 
-        bamCoverage \
+        bamCoverage ${params.extend_reads_deeptools} \
         --bam "${bams}" \
         --outFileName "${out_bigwig_name}" \
         --outFileFormat "bigwig" \

@@ -19,6 +19,18 @@ params.blacklist_option = params.BL ? 'bl_filt' : 'not_bl_filt'
 // this will assign the string for the type of normalization to this variable
 params.normalize_bigwig_opt = params.rpgc_bigwig ? 'RPGC' : ( params.cpm_bigwig ? 'CPM': ( params.rpkm_bigwig ? 'RPKM': ( params.bpm ? 'BPM' : 'None')))
 
+// can i do the conditional statement here so I dont need to duplicate the deeptools_make_bed process for if the user used params.PE or params.SE
+
+// I need to allow the user to put the final fragment length for the extend reads parameter if using SE (single end data)
+// only with single end data will the user need to specify a number to extend the reads by
+// will use 200 as the final length
+params.final_extend_reads_len = '200'
+
+// if it is pair end data (PE), then just use the parameter as a string
+// if it is single end, i will concatenate the extendReads parameter with a default length
+// lastly, so if it is neither single end or pair end i will just insert a blank space.
+params.extend_reads_deeptools = params.PE ? '--extendReads ' : (params.SE ? '--extendReads ' + "${params.final_extend_reads_len}" + ' ' : ' ')
+
 include {
     fastp_SE_adapter_known;
     fastp_SE;
