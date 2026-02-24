@@ -789,6 +789,9 @@ process deeptools_make_bed {
     // else {
     //     publishDir "${params.base_out_dir}/no_bl_filt/bed_graphs_deeptools/", mode: 'copy', pattern: '*'
     // }
+
+    publishDir "${params.base_out_dir}/${params.blacklist_option}/bed_graphs_deeptools/", mode: 'copy', pattern: "*.bedgraph"
+    publishDir "${params.base_out_dir}/${params.blacklist_option}/bigwig_deeptools/", mode: 'copy', pattern: "*.bigwig"
     
     
 
@@ -804,8 +807,8 @@ process deeptools_make_bed {
 
     script:
 
-    out_bed_name="${bams.baseName}_normalized_cpm.bed"
-    out_bigwig_name = "${bams.baseName}_normalized_cpm.bigwig"
+    out_bed_name="${bams.baseName}_normalized_${params.normalize_bigwig_opt}_SF${params.bam_cov_scaleFactor}.bedgraph"
+    out_bigwig_name = "${bams.baseName}_normalized_${params.normalize_bigwig_opt}_SF${params.bam_cov_scaleFactor}.bigwig"
 
     // now I implemented a way to have the pipeline make the bin size equal to 1 if the user is working with bisulfate methylation data.
     if (params.bisulfate_methylation) {
@@ -837,9 +840,9 @@ process deeptools_make_bed {
             --bam "${bams}" \
             --outFileName "${out_bed_name}" \
             --outFileFormat "bedgraph" \
-            --scaleFactor 1 \
+            --scaleFactor ${params.bam_cov_scaleFactor} \
             --binSize 10 \
-            --normalizeUsing CPM \
+            --normalizeUsing ${params.normalize_bigwig_opt} \
             --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
             --skipNonCoveredRegions
 
@@ -847,9 +850,9 @@ process deeptools_make_bed {
             --bam "${bams}" \
             --outFileName "${out_bigwig_name}" \
             --outFileFormat "bigwig" \
-            --scaleFactor 1 \
+            --scaleFactor ${params.bam_cov_scaleFactor} \
             --binSize 10 \
-            --normalizeUsing CPM \
+            --normalizeUsing ${params.normalize_bigwig_opt} \
             --effectiveGenomeSize "${params.num_effectiveGenomeSize}"
 
 
@@ -865,18 +868,18 @@ process deeptools_make_bed {
             --bam "${bams}" \
             --outFileName "${out_bed_name}" \
             --outFileFormat "bedgraph" \
-            --scaleFactor 1 \
+            --scaleFactor ${params.bam_cov_scaleFactor} \
             --binSize 10 \
-            --normalizeUsing CPM \
+            --normalizeUsing ${normalize_bigwig_opt} \
             --skipNonCoveredRegions
 
             bamCoverage \
             --bam "${bams}" \
             --outFileName "${out_bigwig_name}" \
             --outFileFormat "bigwig" \
-            --scaleFactor 1 \
+            --scaleFactor ${params.bam_cov_scaleFactor} \
             --binSize 10 \
-            --normalizeUsing CPM
+            --normalizeUsing ${params.normalize_bigwig_opt}
 
             """
 
@@ -911,9 +914,9 @@ process deeptools_make_bed {
         --bam "${bams}" \
         --outFileName "${out_bed_name}" \
         --outFileFormat "bedgraph" \
-        --scaleFactor 1 \
-        --binSize 50 \
-        --normalizeUsing CPM \
+        --scaleFactor ${params.bam_cov_scaleFactor} \
+        --binSize ${params.bam_cov_binSize} \
+        --normalizeUsing ${params.normalize_bigwig_opt} \
         --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
         --skipNonCoveredRegions
 
@@ -921,9 +924,9 @@ process deeptools_make_bed {
         --bam "${bams}" \
         --outFileName "${out_bigwig_name}" \
         --outFileFormat "bigwig" \
-        --scaleFactor 1 \
-        --binSize 50 \
-        --normalizeUsing CPM \
+        --scaleFactor ${params.bam_cov_scaleFactor} \
+        --binSize ${params.bam_cov_binSize} \
+        --normalizeUsing ${params.normalize_bigwig_opt} \
         --effectiveGenomeSize "${params.num_effectiveGenomeSize}"
 
 
@@ -939,18 +942,18 @@ process deeptools_make_bed {
         --bam "${bams}" \
         --outFileName "${out_bed_name}" \
         --outFileFormat "bedgraph" \
-        --scaleFactor 1 \
-        --binSize 50 \
-        --normalizeUsing CPM \
+        --scaleFactor ${params.bam_cov_scaleFactor} \
+        --binSize ${params.bam_cov_binSize} \
+        --normalizeUsing ${normalize_bigwig_opt} \
         --skipNonCoveredRegions
 
         bamCoverage \
         --bam "${bams}" \
         --outFileName "${out_bigwig_name}" \
         --outFileFormat "bigwig" \
-        --scaleFactor 1 \
-        --binSize 50 \
-        --normalizeUsing CPM
+        --scaleFactor ${params.bam_cov_scaleFactor} \
+        --binSize ${params.bam_cov_binSize} \
+        --normalizeUsing ${params.normalize_bigwig_opt}
 
         """
 
