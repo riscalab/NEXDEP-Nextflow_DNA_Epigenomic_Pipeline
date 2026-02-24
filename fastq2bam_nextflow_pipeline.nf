@@ -12,6 +12,13 @@ params.pe_or_se_name = params.PE ? 'PE' : (params.SE ? 'SE' : '')
 
 params.expr_type = params.gloe_seq ? 'gloeseq_data': (params.end_seq ? 'endseq_data': '')
 
+// do this to make a sub dir that stores to blacklist filtered or no blacklist filtered
+
+params.blacklist_option = params.BL ? 'bl_filt' : 'not_bl_filt'
+
+// this will assign the string for the type of normalization to this variable
+params.normalize_bigwig_opt = params.rpgc_bigwig ? 'RPGC' : ( params.cpm_bigwig ? 'CPM': ( params.rpkm_bigwig ? 'RPKM': ( params.bpm ? 'BPM' : 'None')))
+
 include {
     fastp_SE_adapter_known;
     fastp_SE;
