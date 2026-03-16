@@ -157,7 +157,10 @@ process fastp_SE {
 // dont forget about multiqc m
 process fastqc_SE {
     // using the conda environment 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastqc_rj_env.yml'
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastqc_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastqc_rj'
+
     publishDir "${params.base_out_dir}/fastqc_htmls", mode: 'copy', pattern: '*.html'
 
 
@@ -389,7 +392,11 @@ process bedGraph_to_bigwig_process {
 // Creating two processes that will index the reference genome
 
 process bwa_index_genome {
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+
+    // conda 'conda_envs/bwa_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_rj'
 
     
     // do not need to output these files either
@@ -434,7 +441,9 @@ process bwa_index_genome {
 // creating a process that will align the reads to the genome. i will take in the reference genome, the index files, the filtered fastq's and their names
 
 process bwa_align_SE {
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_meth_align_rj'
 
     // do not need to output these files either
     // publishDir "${params.base_out_dir}/bwa_outputs_singleEnd_SAM", mode: 'copy', pattern: '*.sam'
@@ -1167,7 +1176,10 @@ process fastp_PE {
 
 process fastqc_PE {
 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastqc_rj_env.yml'
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastqc_rj_env.yml'
+    // conda 'conda_envs/fastqc_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastqc_rj'
 
     publishDir "${params.base_out_dir}/fastqc_pe_files", mode: 'copy', pattern: '*'
 
@@ -1257,7 +1269,12 @@ process multiqc_PE {
 
 process bwa_PE_aln {
 
-    conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+
+    // testing the nextflow cache to use conda env files
+    // conda 'conda_envs/bwa_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_rj'
 
     // do not want to output the sam or bam files anymore
     //publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files", mode: 'copy', pattern: '*.{sam, sai}'
