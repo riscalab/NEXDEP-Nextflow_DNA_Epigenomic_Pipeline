@@ -1477,6 +1477,7 @@ process samtools_index_sort {
     //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
+    label 'normal_big_resources'
 
     //publishDir './blacklist_filt_bam/bl_filt_index', mode: 'copy', pattern:'*.bai'
     
