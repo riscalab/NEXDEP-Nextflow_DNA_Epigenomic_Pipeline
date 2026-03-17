@@ -743,7 +743,7 @@ workflow {
 
 
     }
-    if (params.bisulfate_methylation) {
+    else if (params.bisulfate_methylation) {
 
         // I need to add deeptools make bed process so it will make the bigwig and the 10 bin bedgraph
 
