@@ -110,7 +110,8 @@ include {
 
 include {
 
-    down_stream_workflow
+    down_stream_workflow;
+    gatk_analysis_workflow
 
 }from './workflows/downstream_analysis_workflows.nf'
 
@@ -780,6 +781,14 @@ workflow {
     }
 
 
+    // here I can just have a separate workflow or just process for using GATK picard and other GATK tools
+    // use the bam files from this channel to get the stats bam_index_tuple_ch
+
+    if (params.gatk_workflow) {
+
+        // here I will make a workflow that only uses gatk
+        gatk_analysis_workflow(bam_index_tuple_ch)
+    }
 
     // making a multiqc process for the samtools flagstat log files. this should be able to take the flagstat_log_ch from any part of the choosen paths
     //multiqc_bam_stats(flagstat_log_ch, norm_stats_txt_ch)
