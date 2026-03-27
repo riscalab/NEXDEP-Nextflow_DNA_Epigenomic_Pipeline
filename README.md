@@ -93,7 +93,18 @@ This will put the string that you write at the start of the file name for the ta
 --expr_type : a short string that descirbes your experiment EX: cutntag_h3k27me3_HC
 
 ```
+**For running GATK tools**
+```
+A new workflow was implemented and will use the GATK suite of tools.
+Only one process so far, and it collects insert sizes and creates a histogram and txt file
+You can find the output in the results_PE/GATK_results directory
+I will add another if statement specifically for this process for collecting insert sizes so it only runs if the user has pair end data and uses the --PE parameter
+Other tools that work with single end will have the same logic separation.
 
+--gatk_workflow true
+
+
+```
 **Parameters for making bigwigs and bedgraphs using deeptools bed_coverage**
 ```
 Use these to set the normalization method deeptools will use for both bigwig and bedgraph
