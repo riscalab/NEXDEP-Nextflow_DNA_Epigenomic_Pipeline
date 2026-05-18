@@ -31,9 +31,234 @@ params.final_extend_reads_len = '200'
 // lastly, so if it is neither single end or pair end i will just insert a blank space.
 params.extend_reads_deeptools = params.PE ? '--extendReads ' : (params.SE ? '--extendReads ' + "${params.final_extend_reads_len}" + ' ' : ' ')
 
+
+// I want to throw an exception if short_reads or long_reads are not selected
+if (!params.short_reads && !params.long_reads) {
+
+    throw new Exception('You must specify one of the following parameters "--short_reads" or "--long_reads". This lets the pipeline know if to use fastp for filtering reads <70bp or fastplong for filtering reads 70bp or more. It also, lets the pipeline know if to use bwa aln for <70bp reads or bwa mem for >70bp reads')
+}
+
+
+// checking to see if I can now put all the parameters in an info section that nextflow will print to the console or the slurm output
+
+log.info"""
+
+####### Example run With data ####################
+
+nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+-resume \
+--expr_type 'lauren_digest' \
+--PE \
+--BL \
+--blacklist_path '/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/blacklist/hg38-blacklist.v2.bed' \
+--paired_end_reads '/lustre/fs4/risc_lab/store/risc_data/2026-04-08_LA_HC_X202SC24040240-Z01-F010/01.RawData/*digest*/*_{1,2}*' \
+--use_effectiveGenomeSize \
+--num_effectiveGenomeSize '2913022398' \
+--genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
+--rpgc_bigwig \
+--bam_cov_binSize '150' \
+--bam_cov_scaleFactor '1' \
+--gatk_workflow \
+--long_reads
+
+
+#############################################################################
+
+######### Example run with only the help screen  ###########################
+
+nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+--help
+
+###########################################################################
+
+
+Options For Running This Pipeline:
+
+--help   To show this help screen if errors stop the default help screen
+
+--test   I want to add a parameter where the user can choose to run the pipeline in testing mode or not. testing mode will take only 3 fastq file from a directory of fastq files that the user has.   default = false
+
+
+--PE     I want to make it so the user can specify if these are paired end reads  reads. default = false
+--SE     I want to make it so the user can specify if these are single end reads. default = false
+
+
+--ada_Seq     Adding another parameter for if the user knows the adapter sequence or not. If you want to use, enter the sequence as a string in double quotes (--ada_Seq ""), default = false
+
+
+--BL                    This tells the pipeline to run in blacklist filter mode. Pair with the --blacklist_path. giving the user an option to filter the blacklist if they want to.  default = false
+--blacklist_path        In single quotes enter the path to your blacklist file. The blacklist should be the the blacklist bed file for the same reference gemome version you use
+
+--ATAC   Tell the pipeline to run in ATAC mode. This will shift the coordinates in the bam file to account for Tn5 insertion site.   default = false
+
+--use_effectiveGenomeSize        this will tell the pipeline to run the version that gives the user the option to enter the genome size if they know it. use this for any other genome you are using that is not the default.  give the user option to use effective genome size when making bedfile using deeptools.             default = false
+
+
+--num_effectiveGenomeSize           this next parameter will be where the user inputs the number that represents the size of the genome. default = null
+
+--bisulfate_methylation   user should specify if they want to align reads using bwa_meth for bisulfate sequencing data that looks at methylation.    default = false  
+
+
+--cpm_bigwig      use this if you want your bigwigs normalized using this method.  default = false
+--rpgc_bigwig     use this if you want your bigwigs normalized using this method.  default = false
+--rpkm_bigwig     use this if you want your bigwigs normalized using this method.  default = false
+--bpm_bigwig      use this if you want your bigwigs normalized using this method.  default = false
+
+
+--bam_cov_binSize  now giving the user the option to choose bin size in deeptools bam coverage. setting the default to 100, but user can change it to any number. however for bisulfate sequencing the user does not have this choice, binsize will be 10  default = '100'
+
+
+--bam_cov_scaleFactor              give the user the option to change the scaling factor, defualt will be 1
+
+
+--gatk_workflow         using gatk workflow will perform any analysis with tools from gatk that I decide to add to the pipeline. So far only gets insert sizes and plots them.   default = false
+
+
+// should throw an error if both are still false
+--short_reads      give the user the option to choose between long reads and short reads path of the pipeline.   default = false
+--long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
+
+
+NASA Project parameters:
+
+--calc_break_density                 use this if you are doing a nasa pipeline analysis and want to analyze break density.              default = false
+
+--spike_in                  we need parameters to know if we are running spike in analysis; end-seq(lambda genome), gloe-seq(T7 genome), RICC-seq(yeast gemone). default = false
+
+
+--lambda         use this if you are using the lambda spike in. default = false
+--lambda_genome   use this to specify the path to the lambda genome as a string instead of using the default path
+
+--t7               for t7 spike in.    default = false
+--t7_genome        use this and in single quotes enter the path.   default = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/T7_Phage/genome/Sequence/WholeGenomeFasta/genome.fa')
+
+--yeast            for the yeast spike in.   default = false
+--yeast_genome      use this and in single quotes enter the path.
+
+--give_peak_files     Have a directory that contains all your peak files when running for the nasa project. make a parameter that will take a single directory of peak files.      default = null
+
+--depth_intersection            this new parameter should be for anyone that has alignment bam files and want to check it's depth by seeing how many reads intersect with a given set of already created peak files         default = false
+
+--gloe_seq                if you have gloe seq data for the nasa project.   default = false
+--end_seq                  if you have end seq data for the nasa project.   default= false
+
+--make_scrambled_peaks   for the nasa project to make scrambled peaks.   default = false
+
+"""
+
+if (params.help) {
+
+    log.info"""
+
+    ####### Example run With data ####################
+
+    nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+    -resume \
+    --expr_type 'lauren_digest' \
+    --PE \
+    --BL \
+    --blacklist_path '/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/blacklist/hg38-blacklist.v2.bed' \
+    --paired_end_reads '/lustre/fs4/risc_lab/store/risc_data/2026-04-08_LA_HC_X202SC24040240-Z01-F010/01.RawData/*digest*/*_{1,2}*' \
+    --use_effectiveGenomeSize \
+    --num_effectiveGenomeSize '2913022398' \
+    --genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
+    --rpgc_bigwig \
+    --bam_cov_binSize '150' \
+    --bam_cov_scaleFactor '1' \
+    --gatk_workflow \
+    --long_reads
+
+
+    #############################################################################
+
+    ######### Example run with only the help screen  ###########################
+
+    nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+    --help
+
+    ###########################################################################
+
+
+    Options For Running This Pipeline:
+
+    --help   To show this help screen if errors stop the default help screen
+
+    --test   I want to add a parameter where the user can choose to run the pipeline in testing mode or not. testing mode will take only 3 fastq file from a directory of fastq files that the user has.   default = false
+
+
+    --PE     I want to make it so the user can specify if these are paired end reads  reads. default = false
+    --SE     I want to make it so the user can specify if these are single end reads. default = false
+
+
+    --ada_Seq     Adding another parameter for if the user knows the adapter sequence or not. If you want to use, enter the sequence as a string in double quotes (--ada_Seq ""), default = false
+
+
+    --BL                    This tells the pipeline to run in blacklist filter mode. Pair with the --blacklist_path. giving the user an option to filter the blacklist if they want to.  default = false
+    --blacklist_path        In single quotes enter the path to your blacklist file. The blacklist should be the the blacklist bed file for the same reference gemome version you use
+
+    --ATAC   Tell the pipeline to run in ATAC mode. This will shift the coordinates in the bam file to account for Tn5 insertion site.   default = false
+
+    --use_effectiveGenomeSize        this will tell the pipeline to run the version that gives the user the option to enter the genome size if they know it. use this for any other genome you are using that is not the default.  give the user option to use effective genome size when making bedfile using deeptools.             default = false
+
+
+    --num_effectiveGenomeSize           this next parameter will be where the user inputs the number that represents the size of the genome. default = null
+
+    --bisulfate_methylation   user should specify if they want to align reads using bwa_meth for bisulfate sequencing data that looks at methylation.    default = false  
+
+
+    --cpm_bigwig      use this if you want your bigwigs normalized using this method.  default = false
+    --rpgc_bigwig     use this if you want your bigwigs normalized using this method.  default = false
+    --rpkm_bigwig     use this if you want your bigwigs normalized using this method.  default = false
+    --bpm_bigwig      use this if you want your bigwigs normalized using this method.  default = false
+
+
+    --bam_cov_binSize  now giving the user the option to choose bin size in deeptools bam coverage. setting the default to 100, but user can change it to any number. however for bisulfate sequencing the user does not have this choice, binsize will be 10  default = '100'
+
+
+    --bam_cov_scaleFactor              give the user the option to change the scaling factor, defualt will be 1
+
+
+    --gatk_workflow         using gatk workflow will perform any analysis with tools from gatk that I decide to add to the pipeline. So far only gets insert sizes and plots them.   default = false
+
+
+    // should throw an error if both are still false
+    --short_reads      give the user the option to choose between long reads and short reads path of the pipeline.   default = false
+    --long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
+
+
+    NASA Project parameters:
+
+    --calc_break_density                 use this if you are doing a nasa pipeline analysis and want to analyze break density.              default = false
+
+    --spike_in                  we need parameters to know if we are running spike in analysis; end-seq(lambda genome), gloe-seq(T7 genome), RICC-seq(yeast gemone). default = false
+
+
+    --lambda         use this if you are using the lambda spike in. default = false
+    --lambda_genome   use this to specify the path to the lambda genome as a string instead of using the default path
+
+    --t7               for t7 spike in.    default = false
+    --t7_genome        use this and in single quotes enter the path.   default = file('/rugpfs/fs0/risc_lab/store/risc_data/downloaded/T7_Phage/genome/Sequence/WholeGenomeFasta/genome.fa')
+
+    --yeast            for the yeast spike in.   default = false
+    --yeast_genome      use this and in single quotes enter the path.
+
+    --give_peak_files     Have a directory that contains all your peak files when running for the nasa project. make a parameter that will take a single directory of peak files.      default = null
+
+    --depth_intersection            this new parameter should be for anyone that has alignment bam files and want to check it's depth by seeing how many reads intersect with a given set of already created peak files         default = false
+
+    --gloe_seq                if you have gloe seq data for the nasa project.   default = false
+    --end_seq                  if you have end seq data for the nasa project.   default= false
+
+    --make_scrambled_peaks   for the nasa project to make scrambled peaks.   default = false
+
+    """
+}
+
 include {
     fastp_SE_adapter_known;
+    fastplong_SE_adapter_known;
     fastp_SE;
+    fastplong_SE;
     fastqc_SE;
     multiqc_SE;
     bwa_index_genome;
@@ -44,6 +269,7 @@ include {
     bedtools_filt_blacklist;
     samtools_bl_index;
     fastp_PE;
+    fastplong_PE;
     fastqc_PE;
     multiqc_PE;
     bwa_PE_aln;
@@ -235,30 +461,62 @@ workflow {
                 params.adapter_seq_str = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' // this is just a place holder value for the adapter sequence
                 adapter_ch = Channel.value(params.adapter_seq_str)
 
-                fastp_SE_adapter_known(se_reads_files, se_reads_name, adapter_ch) // will have to make a new process for if the adapter sequence is known
+                if (params.short_reads) {
 
-                fastq_filts = fastp_SE_adapter_known.out.filtered_fastqs
-                //fastp_SE.out.view()
-                fastq_filts.map{file -> file.baseName}
-                            .set{fastq_filts_name}
+                    fastp_SE_adapter_known(se_reads_files, se_reads_name, adapter_ch) // will have to make a new process for if the adapter sequence is known
 
-                // now getting the html files since i think fastqc combines them into one, that might be multiqc
-                fastp_filt_html = fastp_SE_adapter_known.out.fastp_html_reports
+                    fastq_filts = fastp_SE_adapter_known.out.filtered_fastqs
+                    //fastp_SE.out.view()
+                    fastq_filts.map{file -> file.baseName}
+                                .set{fastq_filts_name}
+
+                    // now getting the html files since i think fastqc combines them into one, that might be multiqc
+                    fastp_filt_html = fastp_SE_adapter_known.out.fastp_html_reports
+                }
+                else if (params.long_reads) {
+
+                    fastplong_SE_adapter_known(se_reads_files, se_reads_name, adapter_ch)
+
+                    fastq_filts = fastplong_SE_adapter_known.out.filtered_fastqs
+                    //fastp_SE.out.view()
+                    fastq_filts.map{file -> file.baseName}
+                                .set{fastq_filts_name}
+
+                    // now getting the html files since i think fastqc combines them into one, that might be multiqc
+                    fastp_filt_html = fastplong_SE_adapter_known.out.fastp_html_reports
+                }
 
             }    
             else {
 
-                fastp_SE(se_reads_files, se_reads_name)
+                if (params.short_reads) {
 
-                    // take all of the filtered fastq files and put them in a channel name
-                // since the fastq files might be in a different order, if i need to get their base names I will have to do it from this new channel below
-                fastq_filts = fastp_SE.out.filtered_fastqs
-                //fastp_SE.out.view()
-                fastq_filts.map{file -> file.baseName}
-                            .set{fastq_filts_name}
+                    fastp_SE(se_reads_files, se_reads_name)
 
-                // now getting the html files since i think fastqc combines them into one, that might be multiqc
-                fastp_filt_html = fastp_SE.out.fastp_html_reports
+                        // take all of the filtered fastq files and put them in a channel name
+                    // since the fastq files might be in a different order, if i need to get their base names I will have to do it from this new channel below
+                    fastq_filts = fastp_SE.out.filtered_fastqs
+                    //fastp_SE.out.view()
+                    fastq_filts.map{file -> file.baseName}
+                                .set{fastq_filts_name}
+
+                    // now getting the html files since i think fastqc combines them into one, that might be multiqc
+                    fastp_filt_html = fastp_SE.out.fastp_html_reports
+                }
+                else if (params.long_reads) {
+
+                    fastplong_SE(se_reads_files, se_reads_name)
+
+                    fastq_filts = fastplong_SE.out.filtered_fastqs
+                    //fastp_SE.out.view()
+                    fastq_filts.map{file -> file.baseName}
+                                .set{fastq_filts_name}
+
+                    // now getting the html files since i think fastqc combines them into one, that might be multiqc
+                    fastp_filt_html = fastplong_SE.out.fastp_html_reports
+
+
+                }
 
 
 
@@ -489,9 +747,16 @@ workflow {
 
 
         //pe_fastqs_ch.view()
+        if (params.short_reads){ 
+            fastp_PE(pe_fastqs_ch)
+            pe_filt_tuple_ch = fastp_PE.out.filt_PE_tuple
+        }
+        else if (params.long_reads){
 
-        fastp_PE(pe_fastqs_ch)
+            fastplong_PE(pe_fastqs_ch)
+            pe_filt_tuple_ch = fastplong_PE.out.filt_PE_tuple
 
+        }
         // checking the channels to see if everything works
         //fastp_PE.out.filt_PE_tuple.view()
 
@@ -499,7 +764,7 @@ workflow {
         //fastp_PE.out.failed_reads_out.view()
         //fastp_PE.out.
 
-        pe_filt_tuple_ch = fastp_PE.out.filt_PE_tuple
+        // pe_filt_tuple_ch = fastp_PE.out.filt_PE_tuple
 
         fastqc_PE(pe_filt_tuple_ch)
 
@@ -536,6 +801,7 @@ workflow {
             //genome_ch.view()
             //genome_index_ch.view()
 
+            // this process has an if statement that chooses between bwa aln for short reads, and bwa mem for long reads
             bwa_PE_aln(pe_filt_tuple_ch, genome_ch, genome_index_ch)
 
             // now check to see if the output channels are good

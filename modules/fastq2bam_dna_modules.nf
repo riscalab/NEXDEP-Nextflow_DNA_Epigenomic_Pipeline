@@ -73,6 +73,99 @@ process fastp_SE_adapter_known {
 
 }
 
+process fastplong_SE_adapter_known {
+    // using this conda yml file that I created. Nextflow will now make its own conda environment from the dependencies found within.
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastp_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastplong_rj'
+
+    // do not need to output these files either
+    //publishDir "${params.base_out_dir}/fastp_qc_single_end", mode: 'copy', pattern:'*_fp_filt.fastq'
+    publishDir "${params.base_out_dir}/fastp_qc_single_end/html_reports", mode: 'copy', pattern:'*.html'
+
+    input:
+    // input names dont have to be the exact same as what is seen in the workflow section of this script
+    // as long and they are in the same order, you will have the correct input
+    path(fastq_files) // the files
+    val(fastq_names) // the names of the files as a value input channel
+    val(adapter_seq)
+
+
+    output:
+    path("${out_name}"), emit: filtered_fastqs
+    path("${fastq_names}*.html"), emit: fastp_html_reports
+
+
+    script:
+
+    // getting the output name
+    out_name = "${fastq_names}.fp_filt.fastq"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # ASK HERA ABOUT THE ADAPTERS USED AND FIND THEM FROM THE ILLUMINA KIT
+
+    # remember this process is for the single end reads so only one read in and one filtered qc read out
+    # adapter trimming is enabled by defualt for single end but use --detect_adapter_for_pe to enable it in paired end data
+    # you can specify the adapter sequence if you have them. look at documentation here: https://open.bioqueue.org/home/knowledge/showKnowledge/sig/fastp
+    
+    # --adapter_sequence: string sequence that represents the adapter used. in the illumina NEBNext libraries adapter read 1: AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Adapter read 2 is AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+    # --dedup enables the deduplication to drop the duplicated reads
+    # --dup_calc_accuracy: defualt is 3 but can go from 1~6. higher levels use more memory
+    # --trim_poly_g: novaSeq data polyG can happen in read tails since G means no signal in the illumina two-color system. fastp can detect and trim them.
+    # --qualified_quality_phred: the quality value that a base is qualified defualt is 15
+    # --unqualified_percent_limit: how many percent of bases are allowed to be unqualified defualt is 40
+    # --umi: not using this yet have to use --umi_loc also and i dont know that, fastp can extract the unique molecular identifiers and append them to the first part of the read names, so the umi's will be present in SAM/BAM records If the UMI is in the reads, then it will be shifted from read so that the read will become shorter. If the UMI is in the index, it will be kept.
+    # --overrepresentation_analysis and --overrepresentation_sampling see fastp documentation
+    # --html: this is how the report file will be made
+
+    # their fastq2bam single end pipeline used trim_galore tool for trimming adapters.
+    # I want to implement a way to choose to let fastp do this by default or use a known sequence that the user can input.
+    ###### can add or remove more options when needed #####
+    
+    #fastp \
+    #--in1 "\${fastq_files}" \
+    #--out1 "\${out_name}" \
+    #--adapter_sequence "\${adapter_seq}" \
+    #--dedup \
+    #--dup_calc_accuracy 5 \
+    #--trim_poly_g \
+    #--qualified_quality_phred 15 \
+    #--unqualified_percent_limit 40 \
+    #--overrepresentation_analysis \
+    #--overrepresentation_sampling 20 \
+    #--html "\${fastq_names}_fastp.html"
+
+
+    ##### fastplong parameters ##########
+    # if end_adapter is not specified then the reverse complement of the start adapter will be used
+
+
+    ###################################
+
+    fastplong \
+    --in "${fastq_files}" \
+    --out "${out_name}" \
+    --start_adapter "${adapter_seq}" \
+    --trim_poly_x \
+    --qualified_quality_phred 20 \
+    --unqualified_percent_limit 40 \
+    --n_base_limit 5 \
+    --mean_qual 0 \
+    --html "${fastq_names}_fastp.html" \
+    --verbose \
+    --thread 15
+
+
+    
+
+
+    """
+
+}
+
 
 
 
@@ -152,6 +245,89 @@ process fastp_SE {
     """
 
 }
+
+// now for the fastplong with single end without adapter known
+
+process fastplong_SE {
+    // using this conda yml file that I created. Nextflow will now make its own conda environment from the dependencies found within.
+    //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastp_rj_env.yml'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastplong_rj'
+
+    // do not need to output these files either
+    // publishDir "${params.base_out_dir}/fastp_qc_single_end", mode: 'copy', pattern:'*_fp_filt.fastq'
+    publishDir "${params.base_out_dir}/fastp_qc_single_end/html_reports", mode: 'copy', pattern:'*.html'
+
+    input:
+    // input names dont have to be the exact same as what is seen in the workflow section of this script
+    // as long and they are in the same order, you will have the correct input
+    path(fastq_files) // the files
+    val(fastq_names) // the names of the files as a value input channel
+
+
+
+    output:
+    path("${out_name}"), emit: filtered_fastqs
+    path("${fastq_names}*.html"), emit: fastp_html_reports
+
+
+    script:
+
+    // getting the output name
+    out_name = "${fastq_names}.fp_filt.fastq"
+
+
+    """
+    #!/usr/bin/env bash
+
+    # ASK HERA ABOUT THE ADAPTERS USED AND FIND THEM FROM THE ILLUMINA KIT
+
+    # remember this process is for the single end reads so only one read in and one filtered qc read out
+    # adapter trimming is enabled by defualt for single end but use --detect_adapter_for_pe to enable it in paired end data
+    # you can specify the adapter sequence if you have them. look at documentation here: https://open.bioqueue.org/home/knowledge/showKnowledge/sig/fastp
+    
+    # --adapter_sequence: string sequence that represents the adapter used. in the illumina NEBNext libraries adapter read 1: AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Adapter read 2 is AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+    # --dedup enables the deduplication to drop the duplicated reads
+    # --dup_calc_accuracy: defualt is 3 but can go from 1~6. higher levels use more memory
+    # --trim_poly_g: novaSeq data polyG can happen in read tails since G means no signal in the illumina two-color system. fastp can detect and trim them.
+    # --qualified_quality_phred: the quality value that a base is qualified defualt is 15
+    # --unqualified_percent_limit: how many percent of bases are allowed to be unqualified defualt is 40
+    # --umi: not using this yet have to use --umi_loc also and i dont know that, fastp can extract the unique molecular identifiers and append them to the first part of the read names, so the umi's will be present in SAM/BAM records If the UMI is in the reads, then it will be shifted from read so that the read will become shorter. If the UMI is in the index, it will be kept.
+    # --overrepresentation_analysis and --overrepresentation_sampling see fastp documentation
+    # --html: this is how the report file will be made
+
+    # their fastq2bam single end pipeline used trim_galore tool for trimming adapters.
+    # I want to implement a way to choose to let fastp do this by default or use a known sequence that the user can input.
+    ###### can add or remove more options when needed #####
+    
+    
+    ###### fastplong for single end data without the adapter known #####
+
+    # just removed the --start_adapter parameter
+
+    # If all these adapter options (start_adapter, end_adapter and adapter_fasta) are not specified, fastplong will try to detect the read start and read end adapters automatically. The detected adapter sequences may be a bit shorter or longer than the real ones. And there is a certain probability of misidentification, especially when most reads don't have adapters (it won't cause too bad result in this case).
+
+    ###########################
+
+
+    fastplong \
+    --in "${fastq_files}" \
+    --out "${out_name}" \
+    --trim_poly_x \
+    --qualified_quality_phred 20 \
+    --unqualified_percent_limit 40 \
+    --n_base_limit 5 \
+    --mean_qual 0 \
+    --html "${fastq_names}_fastp.html" \
+    --verbose \
+    --thread 15
+
+
+
+    """
+
+}
+
 
 // this next process is for fastqc tool
 // dont forget about multiqc m
@@ -1174,6 +1350,158 @@ process fastp_PE {
 
 }
 
+process fastplong_PE {
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastplong_rj'
+    label 'normal_small_resources'
+
+    // do not want to output any of the fastq files either
+    // publishDir "${params.base_out_dir}/fastp_pe_results/filt_fastqs", mode: 'copy', pattern: '*_filt_{R1,R2}*'
+
+    // publishDir "${params.base_out_dir}/fastp_pe_results/merged_filt_fastqs", mode: 'copy', pattern: '*_merged*'
+
+    // publishDir "${params.base_out_dir}/fastp_pe_results/failed_qc_reads", mode: 'copy', pattern: '*_failed_filter*'
+
+    publishDir "${params.base_out_dir}/fastplong_pe_results/htmls", mode: 'copy', pattern: '*fastp.html'
+
+
+    input:
+
+    tuple val(fastq_name), path(fastq)
+
+
+    output:
+
+    // tuple val(fastq_name), path("${out_name_1}"), path("${out_name_2}"), emit: filt_PE_tuple
+
+    // i need to put the paired files now
+    tuple val(fastq_name), path("*R1_*.paired*"), path("*R2_*.paired*"), emit: filt_PE_tuple
+    //path("${merged_reads_file}"), emit: merged_filt_reads
+    path("*.html"), emit: html_fastp_out
+    path("*.failed*.fastq"), emit: failed_reads_out
+
+
+    script:
+
+    out_name_1 = "${fastq_name}.filt_R1_0.fastq"
+    out_name_2 = "${fastq_name}.filt_R2_0.fastq"
+    // the fastq-pair tool will take the above names and add paired.fq at the end. that is what i am outputing
+    failed_reads_fileR1 = "${fastq_name}.failed_filter_R1_reads.fastq"
+    failed_reads_fileR2 = "${fastq_name}.failed_filter_R2_reads.fastq"
+    merged_reads_file = "${fastq_name}.merged_file_reads.fastq"
+    html_file_nameR1 = "${fastq_name}.R1_fastp.html"
+    html_file_nameR2 = "${fastq_name}.R2_fastp.html"
+
+    """
+    #!/usr/bin/env bash
+
+    # this below is just debugging
+    echo "this is the file name: ${fastq_name}; this is the forward read (r1): ${fastq[0]}; this is the reverse read(r2): ${fastq[1]}"
+
+    # have to check if these parameters are still in fastp long
+    ############# Now the PE fastp parameters ################
+    # --in1 or -i : takes the first pair end read
+    # --in2 or -I : takes the second pair end read
+    # --out1 or -o : is the output file name of the fastp first read
+    # --out2 or -O : is the output file name of the fastp second read
+    # --failed_out : specify the file to store reads that cannot pass the filters
+    # --merge or -m : for paired end input, merge each pair of reads into a single read if they are overlapped. the merged reads are written to --merged_out, the unmerged reads will be written to the --out1 and --out2
+    # --detect_adapter_for_pe : to enable auto detection for PE data. The auto detection for adapter is for SE only, so have to turn on for PE
+    # --dedup : enable deduplication to drop the duplicated reads pairs
+    # --dup_calc_accuracy : accuracy level to calculate duplication (1~6) higher level uses more memory
+    # --trim_poly_g : force polyG tail trimming. polyG can happen if there is no signal in the illumina two-color systems
+    # --trim_poly_x : enable polyX trimming in 3' ends. useful because polyX(polyA) can be found in the tails of mRNA seq reads. DONT NEED THIS IN THIS PIPELINE
+    # --qualified_quality_phred : this is the quality value that a base is qualified. default 15 but i choose 20 meaning phred quality >= 20
+    # --unqualified_percent_limit : how many percent of bases are allowed to be unqualified. defualt is 40 meaning 40%
+    # --n_base_limit : if one read's number of N base is > n ase imit  , then this read/pair is discarded default is 5. see fastp documentation
+    # --average_qual :  if one read's average quality score < avg ual , then this read/pair is discarded. Default 0 means no requirement
+    # --correction or -c : enable base correction in overlapped regions (only for PE data), default is disabled. fastp performs overlap analysis for PE data, which try to find an overlap of each pair of reads. When this option is enabled, and if an proper overlap is found, it can correct mismatched base pairs in overlapped regions of paired end reads, if one base is with high quality while the other is with ultra low quality. If a base is corrected, the quality of its paired base will be assigned to it so that they will share the same quality.
+    # --overlap_len_require : the min length to detect oveerlapped region of PE reads. this will affect overlap analysis based PE merge, adapter trimming. default is 30 but i put 20 since the risca_lab snakemake pipeline looks for 20 
+    # --overlap_diff_limit : the maximum number of mismatched bases to detect overlapped region of PE reads. it will affect any trimming or merge parameters. the default is 5 but i think the risc_lab snakemake pipeline allowed only for 1 mismatched bases. the snake make pipeline does only allow for 1 mismatches. But the author said "for now" so I assumed they will look to change it in the future. maybe i can change it back to the default which is 5
+    # --overrepresentation_analysis : enable overrepresented sequence analysis
+    # --overrepresentation_sampling : the number of reads computed for overrepresentation analysis (1~10000). default 20 i used 30
+    # --html or -h : the html format report file name. default is fastp.html but i made my own name using the base name string (key) of the two fastq files that were input in this channel
+    # --thread or -w : worker thread number default is 2; i used 15
+    ###########################################################
+
+    # NOTE: I will remove the merged reads and only keep all the reads that pass the filtering in their corresponding forward and reverse reads
+    #--merge \
+    #--merged_out "\${merged_reads_file}" 
+
+    ############# Now the PE fastplong parameters ################
+    # first fastplong does not have --in1 or --in2, so I need to do this two times
+    # adapter trimming is on by default, so fastplong doesnt have --detect_adapter_for_pe
+    # i dont see a dedup option like in fastp so I assume it happens automatically with fastplong
+    #  this tool has trim_poly_x not trim_poly_g
+    # --qualified_quality_phred is default 15, i put 20 to match other fastp processes
+    # --unqualified_percent_limit default is 40 percent but I just put it so we remember
+    # --n_base_limit set to 5 to match other implementations of fastp. But if reads are longer, should I increase this to 10 for using fastplong?
+    # --mean_qual  set to 0 means no requiremnt to drop a read if its quality is less than the mean
+    # I dont see --correction parameter
+    # there is no overlap options parameters in fastplong
+    # no overrepresentation analysis options either
+    ###########################################################
+
+    fastplong \
+    --in "${fastq[0]}" \
+    --out "${out_name_1}" \
+    --failed_out "${failed_reads_fileR1}" \
+    --trim_poly_x \
+    --qualified_quality_phred 20 \
+    --unqualified_percent_limit 40 \
+    --n_base_limit 5 \
+    --mean_qual 0 \
+    --html "${html_file_nameR1}" \
+    --verbose \
+    --thread 15
+
+    fastplong \
+    --in "${fastq[1]}" \
+    --out "${out_name_2}" \
+    --failed_out "${failed_reads_fileR2}" \
+    --trim_poly_x \
+    --qualified_quality_phred 20 \
+    --unqualified_percent_limit 40 \
+    --n_base_limit 5 \
+    --mean_qual 0 \
+    --html "${html_file_nameR2}" \
+    --verbose \
+    --thread 15
+
+
+    # this creates mismatched reads because some pairs were filtered out in each file leaving no match
+    # have to use fastq_pair to fix. which will result in one pair file that has to go into bwa mem
+    
+    fastq_pair "${out_name_1}" "${out_name_2}" 
+
+
+    # below are the copied remnent of fastp usage
+    #--in1 "\${fastq[0]}" \
+    #--in2 "\${fastq[1]}" \
+    #--out1 "\${out_name_1}" \
+    #--out2 "\${out_name_2}" \
+    #--failed_out "\${failed_reads_file}" \
+    #--detect_adapter_for_pe \
+    #--dedup \
+    #--dup_calc_accuracy 5 \
+    #--trim_poly_g \
+    #--qualified_quality_phred 20 \
+    #--unqualified_percent_limit 40 \
+    #--n_base_limit 5 \
+    #--average_qual 0 \
+    #--correction \
+    #--overlap_len_require 20 \
+    #--overlap_diff_limit 1 \
+    #--overrepresentation_analysis \
+    #--overrepresentation_sampling 30 \
+    #--html "\${html_file_name}" \
+    #-thread 15
+
+    """
+
+
+}
+
 process fastqc_PE {
 
     // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/fastqc_rj_env.yml'
@@ -1292,7 +1620,7 @@ process bwa_PE_aln {
     output:
 
     path("*.sam"), emit: pe_sam_files
-    path("*.sai"), emit: pe_sai_files
+    // path("*.sai"), emit: pe_sai_files
 
 
 
@@ -1301,51 +1629,96 @@ process bwa_PE_aln {
     sai_out_file_r1 = "${filt_fastq_name}_filt_r1.sai"
     sai_out_file_r2 = "${filt_fastq_name}_filt_r2.sai"
 
-    out_sam_file = "${filt_fastq_name}.filt_r1_r2.sam"
+    out_sam_file = "${filt_fastq_name}.bwaaln.filt_r1_r2.sam"
+
+    bwa_mem_aligned_pe_sam = "${filt_fastq_name}.bwamem.filt_r1_r2.sam"
+
+    if (params.long_reads) {
+
+        """
+        #!/usr/bin/env bash
+
+        ######## bwa aln parameters  #########
+        # -t : allows for the amout of threads you want this process to use
+
+        # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+        # but the above are for bam files
 
 
-    """
-    #!/usr/bin/env bash
+        #########################################################
 
-    ######## bwa aln parameters  #########
-    # -t : allows for the amout of threads you want this process to use
+        ####### bwa sampe params ######################
 
-    # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
-    # but the above are for bam files
+        # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
 
 
-    #########################################################
-
-    ####### bwa sampe params ######################
-
-    # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+        ###############################################
 
 
-    ###############################################
+        # switching to mem
+
+        bwa mem \
+        -t 20 \
+        "${genome}" \
+        "${fastq_r1}" \
+        "${fastq_r2}" \
+        > "${bwa_mem_aligned_pe_sam}"
 
 
-    bwa aln \
-    -t 20 \
-    "${genome}" \
-    "${fastq_r1}" \
-    > "${sai_out_file_r1}"
+    
 
-    bwa aln \
-    -t 20 \
-    "${genome}" \
-    "${fastq_r2}" \
-    > "${sai_out_file_r2}"
+        """
+    }
+    else if (params.short_reads) {
+
+        """
+        #!/usr/bin/env bash
+
+        ######## bwa aln parameters  #########
+        # -t : allows for the amout of threads you want this process to use
+
+        # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+        # but the above are for bam files
 
 
-    bwa sampe \
-    "${genome}" \
-    "${sai_out_file_r1}" \
-    "${sai_out_file_r2}" \
-    "${fastq_r1}" \
-    "${fastq_r2}" \
-    > "${out_sam_file}"
+        #########################################################
 
-    """
+        ####### bwa sampe params ######################
+
+        # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+
+
+        ###############################################
+
+
+        bwa aln \
+        -t 20 \
+        "${genome}" \
+        "${fastq_r1}" \
+        > "${sai_out_file_r1}"
+
+        bwa aln \
+        -t 20 \
+        "${genome}" \
+        "${fastq_r2}" \
+        > "${sai_out_file_r2}"
+
+        bwa sampe \
+        "${genome}" \
+        "${sai_out_file_r1}" \
+        "${sai_out_file_r2}" \
+        "${fastq_r1}" \
+        "${fastq_r2}" \
+        > "${out_sam_file}"
+
+
+
+        """
+
+
+    }
+
+
 }
 
 process multiqc_bam_stats {
