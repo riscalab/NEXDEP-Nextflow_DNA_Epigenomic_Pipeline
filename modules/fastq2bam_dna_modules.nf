@@ -613,6 +613,53 @@ process bwa_index_genome {
 
 }
 
+process bwamem2_index_genome {
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+
+    // conda 'conda_envs/bwa_rj_env.yml'
+
+    label 'normal_big_resources'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa-mem2_rj'
+
+    
+    // do not need to output these files either
+    // publishDir './genome_index_bwa', mode: 'copy', pattern: '*'
+
+
+    input:
+    path(ref_genome)
+    
+
+
+    output:
+
+    path("*"), emit: genome_index_files
+
+
+    script:
+    // not getting the basename because bwa expects the index files will have the exact file name of the genome but with an .{ext} on the end. 
+    // example genome.fa, genome.fa.amb, genome.fa.ann
+    // not genome.fa, genome.amb, genome.ann
+    //genome_file_name = "${ref_genome.baseName}"
+
+    """
+    #!/usr/bin/env bash
+
+    ############### parameters used ###############
+    # -p: a string representing the prefix of the output database [same as the db filename] so i think just the base name of the genome file
+    # -a: a string, choosing the algorithm to construct the BWT index. either is or bwtsw. I'll use bwtsw
+
+
+    bwa-mem2 index \
+    -p "${ref_genome}" \
+    "${ref_genome}"
+
+
+    """
+
+}
+
 
 // creating a process that will align the reads to the genome. i will take in the reference genome, the index files, the filtered fastq's and their names
 
@@ -1719,6 +1766,243 @@ process bwa_PE_aln {
     }
 
 
+}
+
+
+// cad-c data should not have a problem with long or short read data, just using bwa-mem2 for all cad-c data
+process bwamem2_PE_aln {
+
+    // conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/bwa_rj_env.yml'
+
+    // testing the nextflow cache to use conda env files
+    // conda 'conda_envs/bwa_rj_env.yml'
+
+    label 'normal_big_resources'
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa-mem2_rj'
+
+    // do not want to output the sam or bam files anymore
+    //publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files", mode: 'copy', pattern: '*.{sam, sai}'
+    
+    //publishDir "${params.base_out_dir}/pe_bwa_files/pe_sai_index_files", mode: 'copy', pattern: '*.sai'
+    //cache false 
+
+
+    input:
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2)
+    path(genome)
+    path(genome_index)
+
+
+    output:
+
+    path("*.sam"), emit: pe_sam_files
+    // path("*.sai"), emit: pe_sai_files
+
+
+
+    script:
+
+    sai_out_file_r1 = "${filt_fastq_name}_filt_r1.sai"
+    sai_out_file_r2 = "${filt_fastq_name}_filt_r2.sai"
+
+    out_sam_file = "${filt_fastq_name}.bwaaln.filt_r1_r2.sam"
+
+    bwa_mem_aligned_pe_sam = "${filt_fastq_name}.bwamem.filt_r1_r2.sam"
+
+    
+
+    """
+    #!/usr/bin/env bash
+
+    ######## bwa aln parameters  #########
+    # -t : allows for the amout of threads you want this process to use
+
+    # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+    # but the above are for bam files
+
+
+    #########################################################
+
+    ####### bwa sampe params ######################
+
+    # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+
+
+    ###############################################
+
+
+    # switching to mem
+
+    bwa-mem2 mem \
+    -t 20 \
+    -SP5M \
+    "${genome}" \
+    "${fastq_r1}" \
+    "${fastq_r2}" \
+    > "${bwa_mem_aligned_pe_sam}"
+
+
+
+
+    """
+    
+    
+
+
+}
+
+process pairtools_analysis_process {
+
+    publishDir "${params.base_out_dir}/pair_tools_output", mode: 'copy', pattern: '*'
+
+    // conda '/ru-auth/local/home/risc_soft2/miniconda3/envs/open2c_v3'
+
+    // the risc_soft2 open2c_v3 environment had problems with pysam confilicts
+    // so I made my own version of the conda environment
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/my_ver_open2c_env_rj'
+
+    label 'normal_big_resources'
+
+    input:
+
+    // the bam index tuple
+    tuple path(bam_file), path(index_file)
+    
+    // now the chromsize file
+    path(chroms_path)
+
+
+    output:
+    
+    path("*"), emit: all_pairtools_results
+
+
+    script:
+
+    SAMPLE = "${bam_file.baseName}"
+
+    // not sure if this can work but try new Date()
+    RUN_DATE = new Date().format('yyyy-MM-dd')
+
+    // need the output path
+    pairs = "${SAMPLE}_parse2_${RUN_DATE}.pairs.gz"
+
+    // need to get the stats
+    stats = "${SAMPLE}_parse2_stats_${RUN_DATE}.tsv"
+
+    // need to get the flipped output
+    flipped = "${SAMPLE}_flipped_${RUN_DATE}.pairs.gz"
+
+    // need to get the sorted output name
+    sorted = "${SAMPLE}_sorted_${RUN_DATE}.pairs.gz"
+
+    // get the dedup and dedup_stats name
+
+    dedup =  "${SAMPLE}_dedup_${RUN_DATE}.pairs.gz"
+
+    dedup_stats = "${SAMPLE}_dedup_stats_${RUN_DATE}.tsv"
+
+    // get the sel_direct name
+    sel_direct = "${SAMPLE}_selected_direct_${RUN_DATE}.pairs.gz"
+
+    // get the sel_UU name
+    sel_UU = "${SAMPLE}_selected_UU_${RUN_DATE}.pairs.gz"
+
+    // get the alias_direct name
+    alias_direct = "${SAMPLE}_flipped_sorted_direct_${RUN_DATE}.pairs.gz"
+
+    // get the dedup_final name
+    dedup_final = "${SAMPLE}_dedup_final_${RUN_DATE}.pairs.gz"
+
+    // get the dedup_final_stats name
+    dedup_final_stats = "${SAMPLE}_dedup_final_stats_${RUN_DATE}.tsv"
+
+
+
+    """
+    #!/usr/bin/env bash
+
+    #SAMPLE="\$(basename "\${bam_file}" .bam)"
+    #RUN_DATE="\$(date +%Y%m%d)"
+
+
+    # following Lauren's pairtools workflow here
+
+    # 1) parse2
+    pairtools parse2 \
+    --chroms-path "${chroms_path}" \
+    --output "${pairs}" \
+    --max-inter-align-gap 30 \
+    --min-mapq 30 \
+    --drop-sam \
+    --report-position junction \
+    --report-orientation junction \
+    --add-pair-index \
+    --no-expand \
+    --no-flip \
+    --add-columns mapq \
+    --add-columns cigar \
+    --add-columns matched_bp \
+    --add-columns algn_ref_span \
+    --add-columns dist_to_5 \
+    --add-columns dist_to_3 \
+    --output-stats "${stats}" \
+    --nproc-in 3 --nproc-out 8 \
+    "${bam_file}"
+
+    # 2) flip
+    pairtools flip \
+    --chroms-path "${chroms_path}" \
+    --output "${flipped}" \
+    --nproc-in 16 --nproc-out 16 \
+    "${pairs}"
+
+    # 3) sort
+    pairtools sort \
+    --output "${sorted}" \
+    --nproc-in 16 --nproc-out 16 \
+    "${flipped}"
+
+    # 4) dedup (round 1)
+    pairtools dedup \
+    --output "${dedup}" \
+    --output-stats "${dedup_stats}" \
+    --nproc-in 16 --nproc-out 16 \
+    "${sorted}"
+
+
+    # get the other 4 steps
+
+    # 5) select direct pairs
+    pairtools select \
+    --output "${sel_direct}" \
+    --nproc-in 16 --nproc-out 16 \
+    '(walk_pair_type == "R1" or walk_pair_type == "R2" or walk_pair_type == "R1&2")' \
+    "${dedup}"
+
+    # 6) alias for compatibility
+    cp "${sel_direct}" "${alias_direct}"
+
+
+    # 7) select UU only
+    pairtools select \
+    --output "${sel_UU}" \
+    --nproc-in 16 --nproc-out 16 \
+    'pair_type == "UU"' \
+    "${sel_direct}"
+
+    # 8) dedup final on UU
+    pairtools dedup \
+    --output "${dedup_final}" \
+    --output-stats "${dedup_final_stats}" \
+    --nproc-in 16 --nproc-out 16 \
+    "${sel_UU}"
+
+
+
+
+    """
 }
 
 process multiqc_bam_stats {

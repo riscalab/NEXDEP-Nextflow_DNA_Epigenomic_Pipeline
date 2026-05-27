@@ -118,6 +118,7 @@ Options For Running This Pipeline:
 --short_reads      give the user the option to choose between long reads and short reads path of the pipeline.   default = false
 --long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
 
+--cad_c_path = false  // if the user has cad-c data, the pipeline will use bwa-mem2 and the same parameters found in Jans scripts.
 
 NASA Project parameters:
 
@@ -225,6 +226,7 @@ if (params.help) {
     --short_reads      give the user the option to choose between long reads and short reads path of the pipeline.   default = false
     --long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
 
+    --cad_c_path = false  // if the user has cad-c data, the pipeline will use bwa-mem2 and the same parameters found in Jans scripts.
 
     NASA Project parameters:
 
@@ -262,6 +264,7 @@ include {
     fastqc_SE;
     multiqc_SE;
     bwa_index_genome;
+    bwamem2_index_genome;
     bwa_align_SE;
     samtools_sort;
     bam_log_calc;
@@ -273,6 +276,8 @@ include {
     fastqc_PE;
     multiqc_PE;
     bwa_PE_aln;
+    bwamem2_PE_aln;
+    pairtools_analysis_process;
     multiqc_bam_stats;
     deeptools_aln_shift;
     samtools_index_sort;
@@ -784,6 +789,30 @@ workflow {
 
 
 
+            } else if (params.cad_c_path) {
+
+                // in this section, the cad-c curated parameters for aligning that data to the genome is used
+                
+                // will need to index the genome with a bwa-mem2 process
+                bwamem2_index_genome(genome_ch)
+
+                genome_index_ch = bwamem2_index_genome.out.genome_index_files
+
+                // one thing i can do here is to merge the fastq files if they have multiple lanes marked by L1 or L2 and so on
+                // L1_R1 and L2_R1 would be merged not L1_R1 and L1_R2
+
+                // next I will use the actual bwa mem2 mem alignment option
+                bwamem2_PE_aln(pe_filt_tuple_ch, genome_ch, genome_index_ch)
+
+                sam_files_pe_ch = bwamem2_PE_aln.out.pe_sam_files
+
+                // next, i think use the bam files and run pair tools script, but figure out how pair tools takes files
+                // this is the conda environment that will be used, becasue Jan probably has other tools in it that is necessary
+                // /ru-auth/local/home/risc_soft2/miniconda3/envs/open2c_v3
+                // so it takes one replicate bam at a time and creates pair files from each of them, so i should be fine with the bam index tuple channel
+                // will have to do this section below the gatk_workflow where the bam index tuple is done filtering
+
+
             } else{
             //multiqc_PE.out.summary_of_PE_filt.view()
 
@@ -813,6 +842,8 @@ workflow {
             // using this channel for both if Blacklist or not
             sam_files_pe_ch = bwa_PE_aln.out.pe_sam_files
         }
+
+
         if (params.BL) {
 
             
@@ -1054,6 +1085,26 @@ workflow {
 
         // here I will make a workflow that only uses gatk
         gatk_analysis_workflow(bam_index_tuple_ch)
+    }
+    
+    // instead of doing else if make it so you can do both the gatk and cad-c paths!!
+    // there shouldnt be a problem here with that.
+    if (params.cad_c_path) {
+
+        // next, i think use the bam files and run pair tools script, but figure out how pair tools takes files
+        // this is the conda environment that will be used, becasue Jan probably has other tools in it that is necessary
+        // /ru-auth/local/home/risc_soft2/miniconda3/envs/open2c_v3
+        // so it takes one replicate bam at a time and creates pair files from each of them, so i should be fine with the bam index tuple channel
+        // will have to do this section below the gatk_workflow where the bam index tuple is done filtering
+
+        // make the pair tools process here.
+        // it takes the bam files, the chromsizes file,
+        // have the user give path to chromsizes if not a parameter already.
+
+        // this is the channel that has the chromesome sizes / genome size file "ref_genome_size_ch"
+        // the parameter will be "params.ref_genome_size"
+
+        pairtools_analysis_process(bam_index_tuple_ch, ref_genome_size_ch )
     }
 
     // making a multiqc process for the samtools flagstat log files. this should be able to take the flagstat_log_ch from any part of the choosen paths
