@@ -105,6 +105,18 @@ Other tools that work with single end will have the same logic separation.
 
 
 ```
+
+**For working with CAD-C data**
+```
+
+if you have cad-c data use the following parameter and bwa-mem2 will be used to align your data, also pairtools will be used on that aligned data
+this part of the pipeline is ported for Lauren's cad-c workflow scripts
+
+--cad_c_path
+
+```
+
+
 **Parameters for making bigwigs and bedgraphs using deeptools bed_coverage**
 ```
 Use these to set the normalization method deeptools will use for both bigwig and bedgraph
