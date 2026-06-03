@@ -86,6 +86,45 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 
 # Parameters Section
 
+**Follow the standard naming convention to ensure pipeline works seamlessly**
+```
+
+#############################################################################
+IMPORTANT FOR GROUPING YOUR FILES BY LANE OR LATER BY TECHNICAL REPLICATE
+
+{condition}_{experiment.type}_{replicate.#}_{sicer2.grouping.name}_{lane.#}_{tech rep #}_{forward (R1)/reverse (R2)}.fastq
+
+This is not important if not using the sicer2 path of the peakcalling pipeline "{sicer2.grouping.name}"
+
+Example: 
+{H1low}_{H3K27me3}_{r1}_{HC.hera}_{L001}_{tecrep1}_{R1}.fastq
+
+# so here the two lanes that will be merged after the bam is created for each pair (R1 and R2)
+H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R1.fastq
+H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R2.fastq
+
+H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R1.fastq
+H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R2.fastq
+
+
+--lane_type_field_num [int]  // this is if you have multiple lanes that your experiment came from. I will make it so the pipeline will always merge files with multiple lanes
+
+--experiment_type_field_num [int] // this is the location to find the experiment type field in the file name
+
+--condition_type_field_num [int] // this is the location to find the condition type in the file name
+
+--replicate_type_field_num [int] // this is the location to find the replicate type in the file name
+
+// for cadc files that do not follow the proper naming convention
+// choose a field that groups the files by lane properly so I can merge
+--cadc_grouping_key [int]
+
+
+#############################################################################
+
+
+```
+
 **Not required but good to put**
 ```
 This will put the string that you write at the start of the file name for the table that calculates read depth of experiment
