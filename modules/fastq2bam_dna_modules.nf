@@ -2005,6 +2005,50 @@ process pairtools_analysis_process {
     """
 }
 
+// making a process to merge the bam files based on the lanes
+
+process merge_bam_lanes_process {
+
+    publishDir "${params.base_out_dir}/sorted_bam_files/merged_bam_files", mode: 'copy', pattern:"*"
+
+    // maybe samtools can merge bams and then make the index file
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
+
+    label 'normal_big_resources'
+
+
+
+    input:
+
+    tuple val(grouping_key), path(all_bams_to_merge)
+
+
+    output:
+
+    tuple path("*.merged.bam"), path("*.merged.bam.bai"), emit: merged_bam_index_tuple
+
+
+
+    script:
+
+    output_bam_name = "${grouping_key}.lane.merged.bam"
+
+    """
+    #!/usr/bin/env bash
+
+    samtools merge ${all_bams_to_merge} -o ${output_bam_name}  \
+    
+
+    # now index the merged bam here
+
+    samtools index "${output_bam_name}"
+
+
+
+    """
+
+}
+
 process multiqc_bam_stats {
 
     //conda '/lustre/fs4/home/rjohnson/conda_env_files_rj_test/multiqc_rj_env.yml'

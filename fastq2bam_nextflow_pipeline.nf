@@ -76,6 +76,37 @@ Options For Running This Pipeline:
 
 --help   To show this help screen if errors stop the default help screen
 
+#############################################################################
+IMPORTANT FOR GROUPING YOUR FILES BY LANE OR LATER BY TECHNICAL REPLICATE
+
+{condition}_{experiment.type}_{replicate.#}_{sicer2.grouping.name}_{lane.#}_{tech rep #}_{forward (R1)/reverse (R2)}.fastq
+
+Example: 
+{H1low}_{H3K27me3}_{r1}_{HC.hera}_{L001}_{tecrep1}_{R1}.fastq
+
+# so here the two lanes that will be merged after the bam is created for each pair (R1 and R2)
+H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R1.fastq
+H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R2.fastq
+
+H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R1.fastq
+H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R2.fastq
+
+
+--lane_type_field_num [int]  // this is if you have multiple lanes that your experiment came from. I will make it so the pipeline will always merge files with multiple lanes
+
+--experiment_type_field_num [int] // this is the location to find the experiment type field in the file name
+
+--condition_type_field_num [int] // this is the location to find the condition type in the file name
+
+--replicate_type_field_num [int] // this is the location to find the replicate type in the file name
+
+// for cadc files that do not follow the proper naming convention
+// choose a field that groups the files by lane properly so I can merge
+--cadc_grouping_key [int]
+
+
+#############################################################################
+
 --test   I want to add a parameter where the user can choose to run the pipeline in testing mode or not. testing mode will take only 3 fastq file from a directory of fastq files that the user has.   default = false
 
 
@@ -119,6 +150,15 @@ Options For Running This Pipeline:
 --long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
 
 --cad_c_path = false  // if the user has cad-c data, the pipeline will use bwa-mem2 and the same parameters found in Jans scripts.
+
+USE THESE PARAMETERS FOR SPECIFYING THE LOCATION OF EACH NAME TYPE IN THE FILE NAME
+when using --lane_type_field_num it will merge your bams based on the lane number. but you must specify the other 3 field locations.
+use an integer from 0-3 to specify where each field is located
+
+--condition_type_field_num 
+--experiment_type_field_num 
+--replicate_type_field_num
+--lane_type_field_num
 
 NASA Project parameters:
 
@@ -184,6 +224,37 @@ if (params.help) {
 
     --help   To show this help screen if errors stop the default help screen
 
+    #############################################################################
+    IMPORTANT FOR GROUPING YOUR FILES BY LANE OR LATER BY TECHNICAL REPLICATE
+
+    {condition}_{experiment.type}_{replicate.#}_{sicer2.grouping.name}_{lane.#}_{tech rep #}_{forward (R1)/reverse (R2)}.fastq
+
+    Example: 
+    {H1low}_{H3K27me3}_{r1}_{HC.hera}_{L001}_{tecrep1}_{R1}.fastq
+
+    # so here the two lanes that will be merged after the bam is created for each pair (R1 and R2)
+    H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R1.fastq
+    H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R2.fastq
+
+    H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R1.fastq
+    H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R2.fastq
+
+
+    --lane_type_field_num [int]  // this is if you have multiple lanes that your experiment came from. I will make it so the pipeline will always merge files with multiple lanes
+
+    --experiment_type_field_num [int] // this is the location to find the experiment type field in the file name
+
+    --condition_type_field_num [int] // this is the location to find the condition type in the file name
+
+    --replicate_type_field_num [int] // this is the location to find the replicate type in the file name
+
+    // for cadc files that do not follow the proper naming convention
+    // choose a field that groups the files by lane properly so I can merge
+    --cadc_grouping_key [int]
+
+
+    #############################################################################
+
     --test   I want to add a parameter where the user can choose to run the pipeline in testing mode or not. testing mode will take only 3 fastq file from a directory of fastq files that the user has.   default = false
 
 
@@ -227,6 +298,15 @@ if (params.help) {
     --long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
 
     --cad_c_path = false  // if the user has cad-c data, the pipeline will use bwa-mem2 and the same parameters found in Jans scripts.
+
+    USE THESE PARAMETERS FOR SPECIFYING THE LOCATION OF EACH NAME TYPE IN THE FILE NAME
+    when using --lane_type_field_num it will merge your bams based on the lane number. but you must specify the other 3 field locations.
+    use an integer from 0-3 to specify where each field is located
+
+    --condition_type_field_num 
+    --experiment_type_field_num 
+    --replicate_type_field_num
+    --lane_type_field_num
 
     NASA Project parameters:
 
@@ -288,7 +368,8 @@ include {
     bwa_meth_se;
     bwa_meth_pe;
     find_methylation_stats_process;
-    bedGraph_to_bigwig_process
+    bedGraph_to_bigwig_process;
+    merge_bam_lanes_process
 
 
 
@@ -1075,6 +1156,95 @@ workflow {
         bed_files_norm_ch = deeptools_make_bed.out.bed_files_normalized          
 
 
+    }
+
+    // up here i can put an if statement that merges the bam files based on lanes
+
+    if (params.lane_type_field_num) {
+
+        // throw an error if the lane_type_field_num is set but the others arent
+        if (!params.condition_type_field_num && !params.experiment_type_field_num && !params.replicate_type_field_num) {
+
+            throw new Exception('You need to specify the parameters --condition_type_field_num && --experiment_type_field_num && --replicate_type_field_num, when using the parameter --params.lane_type_field_num. Enter a number that corresponds to the field starting from index 0')
+        }
+
+        if (params.cadc_grouping_key != false) {
+
+            bam_index_tuple_ch 
+                .map{ bam_file, bai_file -> 
+
+                bam_name = bam_file.baseName
+
+                file_tokens = bam_name.tokenize("_")
+
+
+                
+                
+                // what i actually need to do is recreate the file basename without the lane number and group based on that key.
+                // that will get all the files that have the same name but different lanes
+                condition_name = file_tokens[params.condition_type_field_num]
+                experiment_name = file_tokens[params.experiment_type_field_num]
+                replicate_name = file_tokens[params.replicate_type_field_num]
+                lane_name = file_tokens[params.lane_type_field_num]
+
+                // for the cadc data I need to just use the first field as a way to group the data. for now, and call that the grouping field
+                
+                grouping_key = file_tokens[params.cadc_grouping_key]
+                // in the future put the replicate number here so that information is recorded, instead of adding it to the grouping key abovefeil
+                tuple(grouping_key, bam_file)
+
+            }
+            .groupTuple(by:0)
+            // .view {it -> "these are the bams to merge based on the lane number: $it"}
+            .set{bams_to_merge_ch}
+
+
+        } else if (!params.cadc_grouping_key) {
+
+            bam_index_tuple_ch 
+                .map{ bam_file, bai_file -> 
+
+                bam_name = bam_file.baseName
+
+                file_tokens = bam_name.tokenize("_")
+
+
+                
+                
+                // what i actually need to do is recreate the file basename without the lane number and group based on that key.
+                // that will get all the files that have the same name but different lanes
+                condition_name = file_tokens[params.condition_type_field_num]
+                experiment_name = file_tokens[params.experiment_type_field_num]
+                replicate_name = file_tokens[params.replicate_type_field_num]
+                lane_name = file_tokens[params.lane_type_field_num]
+
+                // for the cadc data I need to just use the first field as a way to group the data. for now, and call that the grouping field
+
+                grouping_key = "${condition_name}_${experiment_name}_${replicate_name}"
+                
+
+                // in the future put the replicate number here so that information is recorded, instead of adding it to the grouping key abovefeil
+                tuple(grouping_key, bam_file)
+
+            }
+            .groupTuple(by:0)
+            // .view {it -> "these are the bams to merge based on the lane number: $it"}
+            .set{bams_to_merge_ch}
+            
+        }
+
+        bams_to_merge_ch.view{it -> "these are the bams to merge based on the lane number: $it"}
+        
+
+        // then here make a process to merge bam files, then generate the index files and emit it to a bam index tuple channel and save it into that name also.
+
+        merge_bam_lanes_process(bams_to_merge_ch)
+
+        bam_index_tuple_ch = merge_bam_lanes_process.out.merged_bam_index_tuple
+
+
+
+        
     }
 
 
