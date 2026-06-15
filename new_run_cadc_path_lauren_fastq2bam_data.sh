@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --time=1-00:00:00
 #SBATCH --job-name=nextflow_chip
-#SBATCH --partition=hpc_a10_a
+#SBATCH --partition=hpc_l40_b
 
 #partition options
 #hpc_l40_b
@@ -70,13 +70,41 @@ conda activate nextflow_three
 
 ################## cad-c path with test data (only 2 fastq files PE) ##################
 
+# nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
+# -resume \
+# --expr_type 'lauren_digest' \
+# --PE \
+# --BL \
+# --blacklist_path '/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/blacklist/hg38-blacklist.v2.bed' \
+# --paired_end_reads '/lustre/fs4/risc_lab/store/risc_data/runs2_2026/**/01.RawData/CADCK5627/*_{1,2}*' \
+# --use_effectiveGenomeSize \
+# --num_effectiveGenomeSize '2913022398' \
+# --genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
+# --rpgc_bigwig \
+# --bam_cov_binSize '150' \
+# --bam_cov_scaleFactor '1' \
+# --gatk_workflow \
+# --cad_c_path \
+# --lane_type_field_num 3 \
+# --experiment_type_field_num 0 \
+# --condition_type_field_num 0 \
+# --replicate_type_field_num 2 \
+# --cadc_grouping_key 0 \
+# --long_reads \
+# --merge_by_lane
+
+##########################################################################
+
+
+################## cad-c path with actual data  ##################
+
 nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 -resume \
 --expr_type 'lauren_digest' \
 --PE \
 --BL \
 --blacklist_path '/rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/blacklist/hg38-blacklist.v2.bed' \
---paired_end_reads '/lustre/fs4/risc_lab/store/risc_data/runs2_2026/**/01.RawData/CADCK5627/*_{1,2}*' \
+--paired_end_reads '/lustre/fs4/risc_lab/store/risc_data/runs2_2026/**/01.RawData/*digest*/*_{1,2}*' \
 --use_effectiveGenomeSize \
 --num_effectiveGenomeSize '2913022398' \
 --genome '/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa' \
@@ -86,10 +114,11 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 --gatk_workflow \
 --cad_c_path \
 --lane_type_field_num 3 \
---experiment_type_field_num 1 \
+--experiment_type_field_num 0 \
 --condition_type_field_num 0 \
 --replicate_type_field_num 2 \
 --cadc_grouping_key 0 \
---long_reads
+--long_reads \
+--merge_by_lane 
 
 ##########################################################################
