@@ -423,7 +423,8 @@ include {
 include {
 
     down_stream_workflow;
-    gatk_analysis_workflow
+    gatk_analysis_workflow;
+    merge_by_lane_or_techrep_workflow
 
 }from './workflows/downstream_analysis_workflows.nf'
 
@@ -862,6 +863,26 @@ workflow {
 
         multiqc_PE(collection_fastqc_ch)
 
+        // here I could make a meta data channel that has the lane info, condition, experiment type, and sampleid (condition with experiment type),
+        pe_filt_tuple_ch
+            .map{ filt_fastq_name, read_1, read_2 ->
+
+            base_name = read_1.baseName
+            file_tokens = base_name.tokenize("_")
+
+            condition_name = file_tokens[params.condition_type_field_num]
+            experiment_name = file_tokens[params.experiment_type_field_num]
+            replicate_name = file_tokens[params.replicate_type_field_num]
+            lane_name = file_tokens[params.lane_type_field_num]
+
+            //sample_id = "${condition_name}_${experiment_name}"
+            sample_id = experiment_name
+
+            tuple(filt_fastq_name, read_1, read_2, lane_name, sample_id)
+
+            }
+            .view{it -> "this is attempt to get fastq lane id and other things $it"}
+            .set{pe_filt_tuple_ch}
 
         if (params.bisulfate_methylation) {
                 bwa_meth_pe(pe_filt_tuple_ch, genome_ch)
@@ -939,6 +960,39 @@ workflow {
             // flagstat_log_ch = samtools_sort.out.flag_stats_log.collect() // will make another process or send this to the multiqc process
             // norm_stats_txt_ch = samtools_sort.out.norm_stats_txt.collect()
             // tsv_SN_stats_ch = samtools_sort.out.tsv_SN_stats.collect()
+
+
+            // here i just need to put the logic for merging by lane or tech rep
+
+
+            // up here i can put an if statement that merges the bam files based on lanes
+
+            if (params.merge_by_lane) {
+
+                // throw an error if the lane_type_field_num is set but the others arent
+                if (!params.lane_type_field_num && !params.condition_type_field_num && !params.experiment_type_field_num && !params.replicate_type_field_num) {
+
+                    throw new Exception('You need to specify the parameters --condition_type_field_num && --experiment_type_field_num && --replicate_type_field_num, when using the parameter --params.lane_type_field_num. Enter a number that corresponds to the field starting from index 0')
+                }
+
+                // adding this to a workflow because the main script is getting too large
+                // nextflow main script can only compile a maximum of 65535 is allowed
+                // the error was "String too long. The given string is 68057 Unicode code units long, but only a maximum of 65535 is allowed."
+
+                merge_by_lane_or_techrep_workflow(bam_index_tuple_ch)
+
+                bam_index_tuple_ch = merge_by_lane_or_techrep_workflow.out.bam_index_tuple_ch_out
+                bam_index_tuple_ch.view{it -> "the merged bams and index that will go to bedtool filt blacklist process $it"}
+
+                // have the emitted "bam_index_tuple_for_stats_ch" channel here so it overwrites the one before this if statement
+                bam_index_tuple_for_stats_ch = merge_by_lane_or_techrep_workflow.out.bam_index_tuple_for_stats_ch
+
+
+                
+            }
+
+
+
 
             // this will give a blacklist filtered bam but i need to index it again
             bedtools_filt_blacklist(bam_index_tuple_ch, blacklist_ch)
@@ -1019,6 +1073,37 @@ workflow {
 
             bam_index_tuple_ch = samtools_sort.out.bam_index_tuple
             bam_index_tuple_for_stats_ch = samtools_sort.out.bam_index_tuple_for_stats
+
+
+
+
+            // here i just need to put the logic for merging by lane or tech rep
+
+
+            // up here i can put an if statement that merges the bam files based on lanes
+
+            if (params.merge_by_lane) {
+
+                // throw an error if the lane_type_field_num is set but the others arent
+                if (!params.lane_type_field_num && !params.condition_type_field_num && !params.experiment_type_field_num && !params.replicate_type_field_num) {
+
+                    throw new Exception('You need to specify the parameters --condition_type_field_num && --experiment_type_field_num && --replicate_type_field_num, when using the parameter --params.lane_type_field_num. Enter a number that corresponds to the field starting from index 0')
+                }
+
+                // adding this to a workflow because the main script is getting too large
+                // nextflow main script can only compile a maximum of 65535 is allowed
+                // the error was "String too long. The given string is 68057 Unicode code units long, but only a maximum of 65535 is allowed."
+
+                merge_by_lane_or_techrep_workflow(bam_index_tuple_ch)
+
+                bam_index_tuple_ch = merge_by_lane_or_techrep_workflow.out.bam_index_tuple_ch_out
+
+                // have the emitted "bam_index_tuple_for_stats_ch" channel here so it overwrites the one before this if statement
+                bam_index_tuple_for_stats_ch = merge_by_lane_or_techrep_workflow.out.bam_index_tuple_for_stats_ch
+
+
+                
+            }
             
 
             // add the if logic for ATAC here
@@ -1158,94 +1243,9 @@ workflow {
 
     }
 
-    // up here i can put an if statement that merges the bam files based on lanes
+    // // up here i can put an if statement that merges the bam files based on lanes
 
-    if (params.lane_type_field_num) {
-
-        // throw an error if the lane_type_field_num is set but the others arent
-        if (!params.condition_type_field_num && !params.experiment_type_field_num && !params.replicate_type_field_num) {
-
-            throw new Exception('You need to specify the parameters --condition_type_field_num && --experiment_type_field_num && --replicate_type_field_num, when using the parameter --params.lane_type_field_num. Enter a number that corresponds to the field starting from index 0')
-        }
-
-        if (params.cadc_grouping_key != false) {
-
-            bam_index_tuple_ch 
-                .map{ bam_file, bai_file -> 
-
-                bam_name = bam_file.baseName
-
-                file_tokens = bam_name.tokenize("_")
-
-
-                
-                
-                // what i actually need to do is recreate the file basename without the lane number and group based on that key.
-                // that will get all the files that have the same name but different lanes
-                condition_name = file_tokens[params.condition_type_field_num]
-                experiment_name = file_tokens[params.experiment_type_field_num]
-                replicate_name = file_tokens[params.replicate_type_field_num]
-                lane_name = file_tokens[params.lane_type_field_num]
-
-                // for the cadc data I need to just use the first field as a way to group the data. for now, and call that the grouping field
-                
-                grouping_key = file_tokens[params.cadc_grouping_key]
-                // in the future put the replicate number here so that information is recorded, instead of adding it to the grouping key abovefeil
-                tuple(grouping_key, bam_file)
-
-            }
-            .groupTuple(by:0)
-            // .view {it -> "these are the bams to merge based on the lane number: $it"}
-            .set{bams_to_merge_ch}
-
-
-        } else if (!params.cadc_grouping_key) {
-
-            bam_index_tuple_ch 
-                .map{ bam_file, bai_file -> 
-
-                bam_name = bam_file.baseName
-
-                file_tokens = bam_name.tokenize("_")
-
-
-                
-                
-                // what i actually need to do is recreate the file basename without the lane number and group based on that key.
-                // that will get all the files that have the same name but different lanes
-                condition_name = file_tokens[params.condition_type_field_num]
-                experiment_name = file_tokens[params.experiment_type_field_num]
-                replicate_name = file_tokens[params.replicate_type_field_num]
-                lane_name = file_tokens[params.lane_type_field_num]
-
-                // for the cadc data I need to just use the first field as a way to group the data. for now, and call that the grouping field
-
-                grouping_key = "${condition_name}_${experiment_name}_${replicate_name}"
-                
-
-                // in the future put the replicate number here so that information is recorded, instead of adding it to the grouping key abovefeil
-                tuple(grouping_key, bam_file)
-
-            }
-            .groupTuple(by:0)
-            // .view {it -> "these are the bams to merge based on the lane number: $it"}
-            .set{bams_to_merge_ch}
-            
-        }
-
-        bams_to_merge_ch.view{it -> "these are the bams to merge based on the lane number: $it"}
-        
-
-        // then here make a process to merge bam files, then generate the index files and emit it to a bam index tuple channel and save it into that name also.
-
-        merge_bam_lanes_process(bams_to_merge_ch)
-
-        bam_index_tuple_ch = merge_bam_lanes_process.out.merged_bam_index_tuple
-
-
-
-        
-    }
+    
 
 
     // here I can just have a separate workflow or just process for using GATK picard and other GATK tools

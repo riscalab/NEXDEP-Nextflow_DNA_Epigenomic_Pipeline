@@ -98,8 +98,8 @@ process get_insert_size_metrics_gatk_process {
 
     output:
 
-    path("${output_txt_filename}"), emit: insert_size_metrics
-    path("${output_histogram_filename}"), emit: insert_size_histogram
+    path("${output_txt_filename}"), emit: insert_size_metrics, optional: true
+    path("${output_histogram_filename}"), emit: insert_size_histogram, optional: true
 
 
 
@@ -121,7 +121,8 @@ process get_insert_size_metrics_gatk_process {
     --INPUT ${bam} \
     --OUTPUT ${output_txt_filename} \
     --Histogram_FILE ${output_histogram_filename} \
-    --MINIMUM_PCT 0.05
+    --MINIMUM_PCT 0.05 \
+    --VALIDATION_STRINGENCY LENIENT
 
 
 

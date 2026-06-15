@@ -460,7 +460,7 @@ process bwa_meth_pe {
 
     input:
 
-    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2)
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id)
 
     path(ref_genome)
 
@@ -1284,9 +1284,9 @@ process samtools_bl_index {
     ##########################################
 
     # just do some sorting 
+    # will remove the flag -t RG
 
     samtools sort \
-    -t RG \
     -o "${out_bam_name_sort}" \
     -O bam \
     "${bl_filt_bam}"
@@ -1659,7 +1659,7 @@ process bwa_PE_aln {
 
 
     input:
-    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2)
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id)
     path(genome)
     path(genome_index)
 
@@ -1680,7 +1680,9 @@ process bwa_PE_aln {
 
     bwa_mem_aligned_pe_sam = "${filt_fastq_name}.bwamem.filt_r1_r2.sam"
 
-    if (params.long_reads) {
+    read_group_string = "@RG\\tID:${sample_id}_${lane_id}\\tSM:${sample_id}\\tLB:1\\tPL:ILLUMINA" 
+
+    if (params.long_reads && !params.merge_by_lane) {
 
         """
         #!/usr/bin/env bash
@@ -1706,6 +1708,43 @@ process bwa_PE_aln {
 
         bwa mem \
         -t 20 \
+        "${genome}" \
+        "${fastq_r1}" \
+        "${fastq_r2}" \
+        > "${bwa_mem_aligned_pe_sam}"
+
+
+    
+
+        """
+    }
+    else if (params.long_reads && params.merge_by_lane) {
+
+        """
+        #!/usr/bin/env bash
+
+        ######## bwa aln parameters  #########
+        # -t : allows for the amout of threads you want this process to use
+
+        # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+        # but the above are for bam files
+
+
+        #########################################################
+
+        ####### bwa sampe params ######################
+
+        # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+
+
+        ###############################################
+
+
+        # switching to mem
+
+        bwa mem \
+        -t 20 \
+        -R "${read_group_string}"  \
         "${genome}" \
         "${fastq_r1}" \
         "${fastq_r2}" \
@@ -1788,7 +1827,7 @@ process bwamem2_PE_aln {
 
 
     input:
-    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2)
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id)
     path(genome)
     path(genome_index)
 
@@ -1808,43 +1847,85 @@ process bwamem2_PE_aln {
     out_sam_file = "${filt_fastq_name}.bwaaln.filt_r1_r2.sam"
 
     bwa_mem_aligned_pe_sam = "${filt_fastq_name}.bwamem.filt_r1_r2.sam"
+    read_group_string = "@RG\\tID:${sample_id}_${lane_id}\\tSM:${sample_id}\\tLB:1\\tPL:ILLUMINA" 
 
     
 
-    """
-    #!/usr/bin/env bash
+    if (params.merge_by_lane) {
 
-    ######## bwa aln parameters  #########
-    # -t : allows for the amout of threads you want this process to use
+    
+        """
+        #!/usr/bin/env bash
 
-    # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
-    # but the above are for bam files
+        ######## bwa aln parameters  #########
+        # -t : allows for the amout of threads you want this process to use
 
-
-    #########################################################
-
-    ####### bwa sampe params ######################
-
-    # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+        # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+        # but the above are for bam files
 
 
-    ###############################################
+        #########################################################
+
+        ####### bwa sampe params ######################
+
+        # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
 
 
-    # switching to mem
-
-    bwa-mem2 mem \
-    -t 20 \
-    -SP5M \
-    "${genome}" \
-    "${fastq_r1}" \
-    "${fastq_r2}" \
-    > "${bwa_mem_aligned_pe_sam}"
+        ###############################################
 
 
+        # switching to mem
+
+        bwa-mem2 mem \
+        -t 20 \
+        -SP5M \
+        -R "${read_group_string}" \
+        "${genome}" \
+        "${fastq_r1}" \
+        "${fastq_r2}" \
+        > "${bwa_mem_aligned_pe_sam}"
 
 
-    """
+
+
+        """
+    } else if (!params.merge_by_lane) {
+
+        """
+        #!/usr/bin/env bash
+
+        ######## bwa aln parameters  #########
+        # -t : allows for the amout of threads you want this process to use
+
+        # -b : Specify the input read sequence file is the BAM format. For paired-end data, two ends in a pair must be grouped together and options -1 or -2 are usually applied to specify which end should be mapped.
+        # but the above are for bam files
+
+
+        #########################################################
+
+        ####### bwa sampe params ######################
+
+        # -r : Specify the read group in a format . this doesnt work if you do not have read group information already in a fastq file that was made from a bam file with the RG information
+
+
+        ###############################################
+
+
+        # switching to mem
+
+        bwa-mem2 mem \
+        -t 20 \
+        -SP5M \
+        "${genome}" \
+        "${fastq_r1}" \
+        "${fastq_r2}" \
+        > "${bwa_mem_aligned_pe_sam}"
+
+
+
+
+        """
+    }
     
     
 
@@ -2009,7 +2090,13 @@ process pairtools_analysis_process {
 
 process merge_bam_lanes_process {
 
+    // if the user specified the blacklist filter path then that process will output the bam to a directory
+    // if the user didnt specify black list filtering then i need to output the bam files from this process to a directory
+    if (params.BL) {
+
+    } else if (!params.BL){
     publishDir "${params.base_out_dir}/sorted_bam_files/merged_bam_files", mode: 'copy', pattern:"*"
+    }
 
     // maybe samtools can merge bams and then make the index file
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
@@ -2025,23 +2112,95 @@ process merge_bam_lanes_process {
 
     output:
 
-    tuple path("*.merged.bam"), path("*.merged.bam.bai"), emit: merged_bam_index_tuple
+    tuple path("${output_bam_nodup_unmapped_filt}"), path("${output_bam_nodup_unmapped_filt_bai}"), emit: merged_bam_index_tuple_no_dup
+
+    tuple path("${dup_bam}"), path("${dup_bam_index}"), emit: merged_bam_index_tuple_dup
 
 
 
     script:
 
-    output_bam_name = "${grouping_key}.lane.merged.bam"
+    output_merged_bam_name = "${grouping_key}_name_ordered.lane.merged.bam"
+    // output_bam_name = "${grouping_key}.lane.merged.filt.unmapped.bam"
+
+
+    //out_bam_filt = "${grouping_key}_bam_filt.bam"
+    
+    out_bam_name_sort = "${grouping_key}_name_ordered.lane.merged.bam"
+    out_bam_coor_sort = "${grouping_key}_filt_coor_sorted.lane.merged.bam"
+    output_bam_nodup_unmapped_filt = "${grouping_key}.NOdup_filt_coor_sorted_unmappedRM.lane.merged.bam"
+    output_bam_nodup_unmapped_filt_bai = "${grouping_key}.NOdup_filt_coor_sorted_unmappedRM.lane.merged.bam.bai"
+    out_bam_fixmate = "${grouping_key}_fixmate.lane.merged.bam"
+    // out_bam_final = "${sam_files.baseName}_markdup_filt_coor_sorted.bam"
+    // flagstats_log = "${sam_files.baseName}_flag_stats.log"
+    // samtools_stats_log = "${sam_files.baseName}_stats.txt"
+    // tsv_file_with_stats = "${sam_files.baseName}_SN_stats.tsv"
+
+    dup_bam = "${grouping_key}.dup.lane.merged.bam"
+    dup_bam_index = "${grouping_key}.dup.lane.merged.bam.bai"
+
+    no_dup_bam = "${grouping_key}.NOdup.lane.merged.bam"
+
+    no_dup_sort_bam = "${grouping_key}.NOdup.lane.merged.coor.sorted.bam"
+    no_dup_sort_bai = "${grouping_key}.NOdup.lane.merged.coor.sorted.bam.bai"
 
     """
     #!/usr/bin/env bash
 
-    samtools merge ${all_bams_to_merge} -o ${output_bam_name}  \
+    samtools merge -c ${all_bams_to_merge} -o ${output_merged_bam_name}  
+
     
 
     # now index the merged bam here
 
-    samtools index "${output_bam_name}"
+    #samtools index "\${output_bam_name}"
+
+
+    # first i have to name sort to use fixmate
+    samtools sort \
+    -o "${out_bam_name_sort}" \
+    -n \
+    -O bam \
+    "${output_merged_bam_name}"
+
+    # now remove the unmapped reads
+    #samtools view -b -e '((flag & 12) == 0) && !(mref == "*")' \${out_bam_name_sort}  -o \${output_bam_unmapped_filt}
+
+    samtools fixmate \
+    -O bam \
+    -m \
+    "${out_bam_name_sort}" \
+    "${out_bam_fixmate}"
+
+
+    # now i will coordinate sort here 
+    # will also add the read group sort
+    samtools sort \
+    -o "${out_bam_coor_sort}" \
+    -O bam \
+    "${out_bam_fixmate}"
+
+
+    # Step 4: Mark duplicates (without removing them)
+    samtools markdup "${out_bam_coor_sort}" "${dup_bam}"
+
+    # Step 5: Index final BAM
+    # I need to output this dup_bam and send it to the bam_log_calc process
+    samtools index "${dup_bam}"
+
+    # now to remove the duplicates
+    samtools markdup -r "${dup_bam}" "${no_dup_sort_bam}"
+
+    # here i should now filter
+    #samtools view -b -e '((flag & 12) == 0) && !(mref == "*")' "\${no_dup_sort_bam}"  -o "\${output_bam_nodup_unmapped_filt}"
+    samtools view -F 12 "${no_dup_sort_bam}" -o "${output_bam_nodup_unmapped_filt}"
+
+    # then sort and index no_dup_bam to use as input to all other processes
+    #samtools sort -o "\${no_dup_sort_bam}" -O bam "\${no_dup_bam}"
+
+    # then index the no dup sort bam
+
+    samtools index -b "${output_bam_nodup_unmapped_filt}"
 
 
 
