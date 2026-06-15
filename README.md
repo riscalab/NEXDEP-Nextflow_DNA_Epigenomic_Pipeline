@@ -106,6 +106,7 @@ H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R2.fastq
 H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R1.fastq
 H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R2.fastq
 
+--merge_by_lane = false // this will be what makes the pipeline include read groups based on meta data for alignment
 
 --lane_type_field_num [int]  // this is if you have multiple lanes that your experiment came from. I will make it so the pipeline will always merge files with multiple lanes
 
@@ -213,6 +214,9 @@ The reason being i specified in fastp that we will look adapters for PE and just
 
 --end_seq or --gloe_seq : the end_seq data and the gloe_seq data names are ordered differently have the user specify if end seq or gloe seq so i can use the correct order for geting name metadata
 
+should throw an error if both are still false below, so user needs to choose one of --short_reads or --long_reads
+--short_reads      give the user the option to choose between long reads and short reads path of the pipeline.   default = false
+--long_reads       give the user the option to choose between long reads and short reads path of the pipeline.   default = false
 
 ```
 
