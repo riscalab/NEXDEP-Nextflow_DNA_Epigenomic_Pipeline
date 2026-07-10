@@ -460,7 +460,7 @@ process bwa_meth_pe {
 
     input:
 
-    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id)
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id), val(renamed_files_std)
 
     path(ref_genome)
 
@@ -471,7 +471,7 @@ process bwa_meth_pe {
 
     script:
 
-    sam_name_out = "${filt_fastq_name}.filt_r1_r2.sam"
+    sam_name_out = "${renamed_files_std}.filt_r1_r2.sam"
 
     """
     #!/usr/bin/env bash
@@ -1659,7 +1659,7 @@ process bwa_PE_aln {
 
 
     input:
-    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id)
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id), val(renamed_files_std)
     path(genome)
     path(genome_index)
 
@@ -1673,12 +1673,12 @@ process bwa_PE_aln {
 
     script:
 
-    sai_out_file_r1 = "${filt_fastq_name}_filt_r1.sai"
-    sai_out_file_r2 = "${filt_fastq_name}_filt_r2.sai"
+    sai_out_file_r1 = "${renamed_files_std}_filt_r1.sai"
+    sai_out_file_r2 = "${renamed_files_std}_filt_r2.sai"
 
-    out_sam_file = "${filt_fastq_name}.bwaaln.filt_r1_r2.sam"
+    out_sam_file = "${renamed_files_std}.bwaaln.filt_r1_r2.sam"
 
-    bwa_mem_aligned_pe_sam = "${filt_fastq_name}.bwamem.filt_r1_r2.sam"
+    bwa_mem_aligned_pe_sam = "${renamed_files_std}.bwamem.filt_r1_r2.sam"
 
     read_group_string = "@RG\\tID:${sample_id}_${lane_id}\\tSM:${sample_id}\\tLB:1\\tPL:ILLUMINA" 
 
@@ -1827,7 +1827,7 @@ process bwamem2_PE_aln {
 
 
     input:
-    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id)
+    tuple val(filt_fastq_name), path(fastq_r1), path(fastq_r2), val(lane_id), val(sample_id), val(renamed_files_std)
     path(genome)
     path(genome_index)
 
@@ -1841,12 +1841,12 @@ process bwamem2_PE_aln {
 
     script:
 
-    sai_out_file_r1 = "${filt_fastq_name}_filt_r1.sai"
-    sai_out_file_r2 = "${filt_fastq_name}_filt_r2.sai"
+    sai_out_file_r1 = "${renamed_files_std}_filt_r1.sai"
+    sai_out_file_r2 = "${renamed_files_std}_filt_r2.sai"
 
-    out_sam_file = "${filt_fastq_name}.bwaaln.filt_r1_r2.sam"
+    out_sam_file = "${renamed_files_std}.bwaaln.filt_r1_r2.sam"
 
-    bwa_mem_aligned_pe_sam = "${filt_fastq_name}.bwamem.filt_r1_r2.sam"
+    bwa_mem_aligned_pe_sam = "${renamed_files_std}.bwamem.filt_r1_r2.sam"
     read_group_string = "@RG\\tID:${sample_id}_${lane_id}\\tSM:${sample_id}\\tLB:1\\tPL:ILLUMINA" 
 
     

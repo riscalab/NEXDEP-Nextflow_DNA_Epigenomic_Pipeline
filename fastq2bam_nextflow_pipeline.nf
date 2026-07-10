@@ -91,6 +91,7 @@ H1low_H3K27me3_r1_HC.hera_L001_tecrep1_R2.fastq
 H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R1.fastq
 H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R2.fastq
 
+--merge_by_lane = false // this will be what makes the pipeline include read groups based on meta data for alignment
 
 --lane_type_field_num [int]  // this is if you have multiple lanes that your experiment came from. I will make it so the pipeline will always merge files with multiple lanes
 
@@ -239,6 +240,7 @@ if (params.help) {
     H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R1.fastq
     H1low_H3K27me3_r1_HC.hera_L002_tecrep1_R2.fastq
 
+    --merge_by_lane = false // this will be what makes the pipeline include read groups based on meta data for alignment
 
     --lane_type_field_num [int]  // this is if you have multiple lanes that your experiment came from. I will make it so the pipeline will always merge files with multiple lanes
 
@@ -875,10 +877,13 @@ workflow {
             replicate_name = file_tokens[params.replicate_type_field_num]
             lane_name = file_tokens[params.lane_type_field_num]
 
+            // now need to add the renamed order of these files
+            renamed_files_std = "${condition_name}_${experiment_name}_${replicate_name}_${lane_name}"
+
             //sample_id = "${condition_name}_${experiment_name}"
             sample_id = experiment_name
 
-            tuple(filt_fastq_name, read_1, read_2, lane_name, sample_id)
+            tuple(filt_fastq_name, read_1, read_2, lane_name, sample_id, renamed_files_std)
 
             }
             .view{it -> "this is attempt to get fastq lane id and other things $it"}
@@ -943,6 +948,18 @@ workflow {
             
             // using this channel for both if Blacklist or not
             sam_files_pe_ch = bwa_PE_aln.out.pe_sam_files
+
+            // recorded the standard naming at the filtered fastq file level
+            // here might be the best spot to pass the workflow
+            // if (!params.lane_type_field_num && !params.condition_type_field_num && !params.experiment_type_field_num && !params.replicate_type_field_num) {
+
+            //     throw new Exception('You need to specify the parameters --condition_type_field_num && --experiment_type_field_num && --replicate_type_field_num, when using the parameter --params.lane_type_field_num. Enter a number that corresponds to the field starting from index 0')
+            // }
+
+            // rename_file_names_workflow(sam_files_pe_ch)
+
+            // // then output the workflow into the same sam_files_pe_ch name
+            // sam_files_pe_ch = rename_file_names_workflow.out.
         }
 
 
@@ -989,6 +1006,18 @@ workflow {
 
 
                 
+            }
+            else {
+
+                // I think here I would add the extra fields the user specified and rename the files
+                // I have to rename the bam name in the process that creates the bam
+                // if (!params.lane_type_field_num && !params.condition_type_field_num && !params.experiment_type_field_num && !params.replicate_type_field_num) {
+
+                //     throw new Exception('You need to specify the parameters --condition_type_field_num && --experiment_type_field_num && --replicate_type_field_num, when using the parameter --params.lane_type_field_num. Enter a number that corresponds to the field starting from index 0')
+                // }
+
+                // rename_file_names_workflow(bam_index_tuple_ch)
+
             }
 
 
