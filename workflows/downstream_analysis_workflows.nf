@@ -87,10 +87,16 @@ workflow merge_by_lane_or_techrep_workflow {
             
             // what i actually need to do is recreate the file basename without the lane number and group based on that key.
             // that will get all the files that have the same name but different lanes
-            condition_name = file_tokens[params.condition_type_field_num]
-            experiment_name = file_tokens[params.experiment_type_field_num]
-            replicate_name = file_tokens[params.replicate_type_field_num]
-            lane_name = file_tokens[params.lane_type_field_num]
+            // condition_name = file_tokens[params.condition_type_field_num]
+            // experiment_name = file_tokens[params.experiment_type_field_num]
+            // replicate_name = file_tokens[params.replicate_type_field_num]
+            // lane_name = file_tokens[params.lane_type_field_num]
+
+            // needed to make this change because the bam files will now be in a different order than the user said the fastq files are in
+            condition_name = file_tokens[0]
+            experiment_name = file_tokens[1]
+            replicate_name = file_tokens[2]
+            lane_name = file_tokens[3]
 
             // for the cadc data I need to just use the first field as a way to group the data. for now, and call that the grouping field
             
@@ -118,10 +124,16 @@ workflow merge_by_lane_or_techrep_workflow {
             
             // what i actually need to do is recreate the file basename without the lane number and group based on that key.
             // that will get all the files that have the same name but different lanes
-            condition_name = file_tokens[params.condition_type_field_num]
-            experiment_name = file_tokens[params.experiment_type_field_num]
-            replicate_name = file_tokens[params.replicate_type_field_num]
-            lane_name = file_tokens[params.lane_type_field_num]
+            // condition_name = file_tokens[params.condition_type_field_num]
+            // experiment_name = file_tokens[params.experiment_type_field_num]
+            // replicate_name = file_tokens[params.replicate_type_field_num]
+            // lane_name = file_tokens[params.lane_type_field_num]
+
+            // needed to make this change because the bam files will now be in a different order than the user said the fastq files are in
+            condition_name = file_tokens[0]
+            experiment_name = file_tokens[1]
+            replicate_name = file_tokens[2]
+            lane_name = file_tokens[3]
 
             // for the cadc data I need to just use the first field as a way to group the data. for now, and call that the grouping field
 
@@ -160,3 +172,20 @@ workflow merge_by_lane_or_techrep_workflow {
 
 
 }
+
+// not doing this becasue I put the template for renaming files in at the filtered fastq file channel level
+// workflow rename_file_names_workflow  {
+
+
+//     take:
+//     sam_files_pe_ch
+
+
+//     main:
+
+
+
+
+//     emit:
+
+// }
