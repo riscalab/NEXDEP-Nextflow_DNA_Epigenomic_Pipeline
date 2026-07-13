@@ -811,6 +811,17 @@ workflow {
     // now I need to make the paired-end part of this pipeline.
     else if (params.PE) {
 
+        if (params.condition_type_field_num == false || params.experiment_type_field_num == false || params.replicate_type_field_num == false || params.lane_type_field_num == false) {
+
+            throw new Exception ('You need to specify what field your metadata name resides. There are four parameters you need to set. --condition_type_field_num, --experiment_type_field_num, --replicate_type_field_num, --lane_type_field_num. Please also use an integer and start counting from index 0')
+
+        }
+
+        if (!(params.condition_type_field_num instanceof Integer) || !(params.experiment_type_field_num instanceof Integer) || !(params.replicate_type_field_num instanceof Integer) || !(params.lane_type_field_num instanceof Integer) ) {
+
+            throw new Exception ('You need to provied an integer for the fields that specify to location of the metadata names.')
+        }
+
         // this will take the paired end reads and keep them together
         // params.paired_end_reads = '/rugpfs/fs0/risc_lab/store/hcanaj/HC_GLOEseq_Novaseq_010925/fastqs_read1_read2/*_{R1,R2}*'
 
@@ -864,6 +875,17 @@ workflow {
         collection_fastqc_ch =fastqc_PE.out.fastqc_zip_files.collect()
 
         multiqc_PE(collection_fastqc_ch)
+
+        // if (!params.condition_type_field_num || !params.experiment_type_field_num || !params.replicate_type_field_num || !params.lane_type_field_num) {
+
+        //     throw new Exception ('You need to specify what field your metadata name resides. There are four parameters you need to set. --condition_type_field_num, --experiment_type_field_num, --replicate_type_field_num, --lane_type_field_num. Please also use an integer and start counting from index 0')
+
+        // }
+
+        // if (params.condition_type_field_num != int || params.experiment_type_field_num != int || params.replicate_type_field_num != int || params.lane_type_field_num != int ) {
+
+        //     throw new Exception ('You need to provied an integer for the fields that specify to location of the metadata names.')
+        // }
 
         // here I could make a meta data channel that has the lane info, condition, experiment type, and sampleid (condition with experiment type),
         pe_filt_tuple_ch
@@ -1379,97 +1401,7 @@ workflow {
         all_peaks_ch = Channel.fromPath(params.give_peak_files)
     }
 
-    // putting this lower since I need to use the bam_index that has all the files including the spike-ins
-    // if (params.calc_break_density){
-    // // i want to call the workflow breakDensityWrapper_workflow and pass the bam_index_tuple_ch as an input from either path where the user chose to do blacklist filter or not. Then also pass the peak files that already exists or are created later as input
     
-    //     if (params.PE) {
-            
-    //         breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
-
-    //     }
-
-    //     if (params.SE) {
-         
-    //         breakDensityWrapper_workflow(bam_index_tuple_ch, all_peaks_ch)
-  
-    //     }
-    // }
-
-
-    // first get a multi map of the different conditions (0gyr, PLC, 200(cells))
-
-    // bed_files_norm_ch
-    //     .multiMap{file ->
-
-    //         zero_gy: file.name ==~ /.*0Gy.*\.bed/ ? file: null
-    //         PLC: file.name ==~ /.*PLC.*\.bed/ ? file: null
-    //         cells: file.name ==~ /.*Cells.*\.bed/ ? file: null
-    //     }
-    //     .set{cell_condition}
-    
-
-    // // cell_condition.zero_gy.view{file -> "0gy: $file"}
-    // // cell_condition.PLC.view{file -> "PLC: $file"}
-    // // cell_condition.cells.view{file -> "cells: $file"}
-    // //cell_condition.zero_gy.view()
-    // // cell_condition.PLC.view()
-    // // cell_condition.cells.view()
-
-    // // filtering the null out of the channels
-
-    // zero_gy_ch = cell_condition.zero_gy.filter{it != null}
-    // plc_ch = cell_condition.PLC.filter{it != null}
-    // cells_ch = cell_condition.cells.filter{it != null}
-
-
-    // try this
-    // if (params.depth_intersection){
-
-    //     bed_files_norm_ch
-    //         .map { file -> tuple(file.baseName, file)}
-    //         .map { name, file -> 
-    //             tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
-    //             tuple(tokens, name, file)
-    //         }
-    //         .map {tokens, name, file ->
-            
-    //             ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
-            
-    //         }
-    //         .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
-    //         .set { grouped_bed_ch}
-    //         //.view()
-            
-
-    //     // trying to cross the channels
-    //     // grouped_bed_ch.view()
-    //     // all_peaks_ch.view()
-    //     grouped_bed_ch.combine(all_peaks_ch).set{combined_bed_peak} // this has the grouped name, condition, basename, bed files, peak files. in that order
-
-    //     align_depth_in_peaks(combined_bed_peak)
-
-    // }
-    // I want to make a log file with all the stats from using samtools stats on each bam file
-
-    //tsv_SN_stats_ch.view{"These are the tsv files $it"}
-    // tsv_SN_stats_ch
-    //     .map{ file -> tuple(file.baseName, file)}
-    //     .set{tsv_SN_stats_tuple_ch}
-    //     //.view {"These are the files with their basenames in a tuple transposed: $it"} // i dont need this transposed, i want all the files and names
-        
-    // //tsv_SN_stats_tuple_ch.view{"These are the files with their basenames in a tuple: $it"}
-
-
-    // if (params.PE) {
-
-    //     py_calc_stats_log(tsv_SN_stats_tuple_ch)
-    // }
-    // if (params.SE) {
-
-    //     py_calc_stats_log(tsv_SN_stats_tuple_ch)
-
-    // }
 
     
     // looking to run the spike_in workflow
