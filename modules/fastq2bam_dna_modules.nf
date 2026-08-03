@@ -555,8 +555,9 @@ process bedGraph_to_bigwig_process {
     # first have to get the first 4 fields of the bedgraph 
     cut -f 1,2,3,5 ${cpg_site_bedgraph} > new_bedGraph.bedGraph
 
+    # I will have to use a glob pattern to get the .fai file now
+    # bedGraphToBigWig new_bedGraph.bedGraph \${chr_sizes} \${out_bigwig_file_name}
     bedGraphToBigWig new_bedGraph.bedGraph ${chr_sizes} ${out_bigwig_file_name}
-
 
 
 
@@ -573,7 +574,7 @@ process bwa_index_genome {
     // conda 'conda_envs/bwa_rj_env.yml'
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_rj'
-
+    label 'normal_big_resources'
     
     // do not need to output these files either
     // publishDir './genome_index_bwa', mode: 'copy', pattern: '*'
@@ -1400,7 +1401,8 @@ process fastp_PE {
 process fastplong_PE {
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/fastplong_rj'
-    label 'normal_small_resources'
+    // label 'normal_small_resources'
+    label 'normal_big_resources'
 
     // do not want to output any of the fastq files either
     // publishDir "${params.base_out_dir}/fastp_pe_results/filt_fastqs", mode: 'copy', pattern: '*_filt_{R1,R2}*'
@@ -1650,6 +1652,7 @@ process bwa_PE_aln {
     // conda 'conda_envs/bwa_rj_env.yml'
 
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/bwa_rj'
+    label 'normal_big_resources'
 
     // do not want to output the sam or bam files anymore
     //publishDir "${params.base_out_dir}/pe_bwa_files/pe_sam_files", mode: 'copy', pattern: '*.{sam, sai}'
@@ -1951,6 +1954,7 @@ process pairtools_analysis_process {
     tuple path(bam_file), path(index_file)
     
     // now the chromsize file
+    // this will now be a bunch of genome index files. I have to specify the .fai file in the script now
     path(chroms_path)
 
 
@@ -2006,6 +2010,9 @@ process pairtools_analysis_process {
 
     #SAMPLE="\$(basename "\${bam_file}" .bam)"
     #RUN_DATE="\$(date +%Y%m%d)"
+
+
+
 
 
     # following Lauren's pairtools workflow here
