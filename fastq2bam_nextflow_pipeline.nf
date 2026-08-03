@@ -38,6 +38,12 @@ if (!params.short_reads && !params.long_reads) {
     throw new Exception('You must specify one of the following parameters "--short_reads" or "--long_reads". This lets the pipeline know if to use fastp for filtering reads <70bp or fastplong for filtering reads 70bp or more. It also, lets the pipeline know if to use bwa aln for <70bp reads or bwa mem for >70bp reads')
 }
 
+if (!params.risc_condo_bank_account && !params.risc_hotel_bank_account) {
+
+    throw new Exception("""You NEED to specify either --risc_condo_bank_account or --risc_hotel_bank_account!!! \nExplanation: The logic is that when you choose the condo bank account, it will automatically use the risc_a node, then that will allow the user to change the processing time that can be allocated
+    the normal partitions from the hotel bank account can only be accessed for 24 hours. The condo node partition, risc_a, can be accessed for 7 days.
+    you can choose condo bank and then change the parameter time below an set it for over 24 hours. the syntax to use is '48.h' in single quotes after the parameter. \n--process_time_big_resources : default is '24.h', but you can set anything less than 7 days. For example '48.h' or '72.h' etc""")
+}
 
 // checking to see if I can now put all the parameters in an info section that nextflow will print to the console or the slurm output
 
@@ -59,10 +65,25 @@ nextflow run fastq2bam_nextflow_pipeline.nf -profile 'fastq2bam2_pipeline' \
 --bam_cov_binSize '150' \
 --bam_cov_scaleFactor '1' \
 --gatk_workflow \
---long_reads
+--long_reads \
+--risc_condo_bank_account \
+--process_time_big_resources '72.h'
 
 
 #############################################################################
+
+########## IMPORTANT PARAMETERS ##################################
+--risc_condo_bank_account  : This parameter will control the slurm HPC account that allocates resources. This is specifically for the Risca lab memebers and will allow them to use the risc_a partition compute node
+--risc_hotel_bank_account  : this parameter does the same as above but it will allow you to use the compute node partitions that are available to all labs at Rockefeller
+# The logic is that when you choose the condo bank account, it will automatically use the risc_a node, then that will allow the user to change the processing time that can be allocated
+# the normal partitions from the hotel bank account can only be accessed for 24 hours. The condo node partition, risc_a, can be accessed for 7 days.
+# you can choose condo bank and then change the parameter time below an set it for over 24 hours. the syntax to use is '48.h' in single quotes
+
+--process_time_big_resources : default is '24.h', but you can set anything less than 7 days. For example '48.h' or '72.h' etc
+
+
+
+####################################################################
 
 ######### Example run with only the help screen  ###########################
 
@@ -208,10 +229,25 @@ if (params.help) {
     --bam_cov_binSize '150' \
     --bam_cov_scaleFactor '1' \
     --gatk_workflow \
-    --long_reads
+    --long_reads \
+    --risc_condo_bank_account \
+    --process_time_big_resources '72.h'
 
 
     #############################################################################
+
+    ########## IMPORTANT PARAMETERS ##################################
+    --risc_condo_bank_account  : This parameter will control the slurm HPC account that allocates resources. This is specifically for the Risca lab memebers and will allow them to use the risc_a partition compute node
+    --risc_hotel_bank_account  : this parameter does the same as above but it will allow you to use the compute node partitions that are available to all labs at Rockefeller
+    # The logic is that when you choose the condo bank account, it will automatically use the risc_a node, then that will allow the user to change the processing time that can be allocated
+    # the normal partitions from the hotel bank account can only be accessed for 24 hours. The condo node partition, risc_a, can be accessed for 7 days.
+    # you can choose condo bank and then change the parameter time below an set it for over 24 hours. the syntax to use is '48.h' in single quotes
+
+    --process_time_big_resources : default is '24.h', but you can set anything less than 7 days. For example '48.h' or '72.h' etc
+
+
+
+    ####################################################################
 
     ######### Example run with only the help screen  ###########################
 
@@ -454,7 +490,7 @@ workflow {
     //params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/hg19/hg19.p13.plusMT_only2.fa')
     
     // trying the analysis set recommended by ucsc
-    params.genome = file('/lustre/fs4/home/rjohnson/downloads/genomes/analysis_set_hg19/hg19.p13.plusMT.no_alt_analysis_set.fa')
+    params.genome = file('/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa')
 
     // this is the path to hg38 /rugpfs/fs0/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa
     // putting the human genome in a channel
@@ -462,8 +498,14 @@ workflow {
     genome_ch = Channel.value(params.genome)
 
     // need the genome/ chromosome sizes
+    
+    
     params.ref_genome_size = file('/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa.fai')
     ref_genome_size_ch = Channel.value(params.ref_genome_size)
+
+    if (params.genome && !params.ref_genome_size || !params.blacklist_path){
+        throw new Exception( """ Please, if you decided to use a new genome file, provide a path to a new chromosome size file also which will be a .fai file. And provide a new blacklist file that matches the genome file  """)
+    }
 
     // hopefully uscs has a corresponding blacklist bed file I can use.
     // this is the only one i see on ucsc. I dont think theres a specific version for hg19 with mitochondrial
@@ -1276,8 +1318,9 @@ workflow {
         cpg_site_bedgraph_ch = find_methylation_stats_process.out.cpg_location_ch
 
         // now I want to take that bedgraph file and use ucsc tools to change it into a bigwig
-
+        // change channel to have chromosome size .fai file from the genome index process genome_index_ch
         bedGraph_to_bigwig_process(cpg_site_bedgraph_ch, ref_genome_size_ch)
+        // bedGraph_to_bigwig_process(cpg_site_bedgraph_ch, genome_index_ch)
     }
     else {
 
@@ -1325,7 +1368,9 @@ workflow {
         // this is the channel that has the chromesome sizes / genome size file "ref_genome_size_ch"
         // the parameter will be "params.ref_genome_size"
 
+        // now to change from using the user specified chromosome size file and using the .fai chromosome size file that is created from the bwa index genome process genome_index_ch
         pairtools_analysis_process(bam_index_tuple_ch, ref_genome_size_ch )
+        // pairtools_analysis_process(bam_index_tuple_ch, genome_index_ch )
     }
 
     // making a multiqc process for the samtools flagstat log files. this should be able to take the flagstat_log_ch from any part of the choosen paths
