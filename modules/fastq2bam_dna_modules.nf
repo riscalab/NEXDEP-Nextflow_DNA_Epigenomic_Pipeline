@@ -742,11 +742,13 @@ process samtools_sort {
 
     label 'normal_big_resources'
     // do not need to output these files either right now
-    // if (!params.BL) {
-    //     publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*_sorted.bam'
-    //     publishDir "${params.base_out_dir}/sorted_bam_files", mode: 'copy', pattern: '*.{bai, csi}'
+    if (!params.BL) {
+        publishDir "${params.base_out_dir}/sorted_bam_noBL_files", mode: 'copy', pattern: '*_sorted.bam'
+        publishDir "${params.base_out_dir}/sorted_bam_noBL_files", mode: 'copy', pattern: '*.{bai, csi}'
 
-    // }else {
+    }
+    
+    //else {
 
         
 
@@ -775,6 +777,8 @@ process samtools_sort {
 
     tuple path("${no_dup_sort_bam}"), path("${no_dup_sort_bai}"), emit: bam_index_tuple
 
+    path("${no_dup_name_sort_bam}"), optional: true, emit: name_sort_bam
+
     // path("*stats.log"), emit: flag_stats_log
     // path("*stats.txt"), emit: norm_stats_txt
     // path("*stats.tsv"), emit: tsv_SN_stats
@@ -798,120 +802,246 @@ process samtools_sort {
 
     no_dup_sort_bam = "${sam_files.baseName}.NOdup.coor.sorted.bam"
     no_dup_sort_bai = "${sam_files.baseName}.NOdup.coor.sorted.bam.bai"
+
+    no_dup_name_sort_bam = "${sam_files.baseName}.NOdup.name.sort.bam"
     
+    if (params.cad_c_path) {
 
-    """
-    #!/usr/bin/env bash
+        """
+        #!/usr/bin/env bash
 
-    ################# samtools parameters used ################
-    # for samtools view
-    # --min-MQ or -q : takes an INT and will skip alignments with a MAPQ smaller than INT
-    # --bam or -b : output in the bam format
-    # this version of bwa didnt recognize --bam or --min-MQ so i just used -b and -q respetively.
+        ################# samtools parameters used ################
+        # for samtools view
+        # --min-MQ or -q : takes an INT and will skip alignments with a MAPQ smaller than INT
+        # --bam or -b : output in the bam format
+        # this version of bwa didnt recognize --bam or --min-MQ so i just used -b and -q respetively.
 
-    # for samtools sort
-    # -o : takes a file. it writes the final sorted output to file rather than standard output
-    # -O : write the final output as sam, bam, or cram
-    # -t : sort by tag, used RG for sorting by read group
+        # for samtools sort
+        # -o : takes a file. it writes the final sorted output to file rather than standard output
+        # -O : write the final output as sam, bam, or cram
+        # -t : sort by tag, used RG for sorting by read group
 
-    # samtools fixmate : preparing for finding the duplicates
-    # -O : specify the format and i choose bam
-    # -m : add ms(mate score) tags. these are used by markdup to select the best reads to keep 
-    # other possible option to look at is -r : remove secondary and unmapped reads ?
-    
-    # for samtools markdup : can only be done on coordinate sorted bam files and run it through samtools fixmate first
-    # -r : remove duplicate reads
-    # --mode or -m : duplicate decision method for paired reads. values are "t" or "s". read documentation but i choose s becasue it tends to return more results. just incase i will remove this option in the pair end mode by adding an if else statement in this process.
+        # samtools fixmate : preparing for finding the duplicates
+        # -O : specify the format and i choose bam
+        # -m : add ms(mate score) tags. these are used by markdup to select the best reads to keep 
+        # other possible option to look at is -r : remove secondary and unmapped reads ?
+        
+        # for samtools markdup : can only be done on coordinate sorted bam files and run it through samtools fixmate first
+        # -r : remove duplicate reads
+        # --mode or -m : duplicate decision method for paired reads. values are "t" or "s". read documentation but i choose s becasue it tends to return more results. just incase i will remove this option in the pair end mode by adding an if else statement in this process.
 
-    # now for samtools index to get index files
-    # -b, --bai: create a bai index; this version of samtools does not support --bai --csi just use -b -c
-    # -c, --csi: create a csi index
-    # -o, --output: write the output index to a file specified  only when one alignment file is being indexed
+        # now for samtools index to get index files
+        # -b, --bai: create a bai index; this version of samtools does not support --bai --csi just use -b -c
+        # -c, --csi: create a csi index
+        # -o, --output: write the output index to a file specified  only when one alignment file is being indexed
 
-    # using samtools flagstat: generate log files so i can use multiqc to get stats of all files into one html file
-    # no parameters needed. just need to give the final bam file that went through all the processing
-    ###########################################################
+        # using samtools flagstat: generate log files so i can use multiqc to get stats of all files into one html file
+        # no parameters needed. just need to give the final bam file that went through all the processing
+        ###########################################################
 
-    # I should add a samtools filtering. looking to only get mapq scores higher than 30
+        # I should add a samtools filtering. looking to only get mapq scores higher than 30
+        # Also, for the cadc path i want to remove the reads that dont have a pair mapped or itself is unmapped
+        samtools view \
+        -b \
+        -F 12 \
+        "${sam_files}" \
+        > "${out_bam_filt}" 
 
-    samtools view \
-    -b \
-    "${sam_files}" \
-    > "${out_bam_filt}" 
-
-    # removed this from above because it messes with samtools markdup: -q 30 \
-    
-    
-    # first i have to name sort to use fixmate
-    samtools sort \
-    -o "${out_bam_name_sort}" \
-    -n \
-    -O bam \
-    "${out_bam_filt}"
-
-
-    samtools fixmate \
-    -O bam \
-    -m \
-    "${out_bam_name_sort}"\
-    "${out_bam_fixmate}"
+        # removed this from above because it messes with samtools markdup: -q 30 \
+        
+        
+        # first i have to name sort to use fixmate
+        samtools sort \
+        -o "${out_bam_name_sort}" \
+        -n \
+        -O bam \
+        "${out_bam_filt}"
 
 
-    # now i will coordinate sort here 
-    # will also add the read group sort
-    samtools sort \
-    -o "${out_bam_coor_sort}" \
-    -O bam \
-    "${out_bam_fixmate}"
+        samtools fixmate \
+        -O bam \
+        -m \
+        "${out_bam_name_sort}"\
+        "${out_bam_fixmate}"
 
 
-    # Step 4: Mark duplicates (without removing them)
-    samtools markdup "${out_bam_coor_sort}" "${dup_bam}"
-
-    # Step 5: Index final BAM
-    # I need to output this dup_bam and send it to the bam_log_calc process
-    samtools index "${dup_bam}"
-
-    # now to remove the duplicates
-    samtools markdup -r "${dup_bam}" "${no_dup_bam}"
-
-    # then sort and index no_dup_bam to use as input to all other processes
-    samtools sort -o "${no_dup_sort_bam}" -O bam "${no_dup_bam}"
-
-    # then index the no dup sort bam
-
-    samtools index -b "${no_dup_sort_bam}"
+        # now i will coordinate sort here 
+        # will also add the read group sort
+        samtools sort \
+        -o "${out_bam_coor_sort}" \
+        -O bam \
+        "${out_bam_fixmate}"
 
 
-    # removed this from above because it messes with samtools markdup: -t RG \
+        # Step 4: Mark duplicates (without removing them)
+        samtools markdup "${out_bam_coor_sort}" "${dup_bam}"
+
+        # Step 5: Index final BAM
+        # I need to output this dup_bam and send it to the bam_log_calc process
+        samtools index "${dup_bam}"
+
+        # now to remove the duplicates
+        samtools markdup -r "${dup_bam}" "${no_dup_bam}"
+
+        # then sort and index no_dup_bam to use as input to all other processes
+        samtools sort -o "${no_dup_sort_bam}" -O bam "${no_dup_bam}"
+
+        # I want to do a name sort here for the cadc path. pairtools prefers name sorted bams. but i cant index the name sorted bam
+        samtools sort -n -o "${no_dup_name_sort_bam}" -O bam "${no_dup_bam}"
+
+        # then index the no dup sort bam
+
+        samtools index -b "${no_dup_sort_bam}"
 
 
-    # i might need to put coordinate sorted bam into markdup
-    # this works but removing the duplicates results in the file being very small meaning too many reads were removed that were considered duplicates.
-    # this results in the next process deeptools not being able to create a normalized bedgraph file
+        # removed this from above because it messes with samtools markdup: -t RG \
 
-    #samtools markdup \
-    #"\${out_bam_coor_sort}" \
-    #"\${out_bam_final}"
 
-    # so i will just use the out file from the coordinate sort samtools sort section instead of using out_bam_final
-    #samtools index \
-    -b \
-    "\${out_bam_coor_sort}"
+        # i might need to put coordinate sorted bam into markdup
+        # this works but removing the duplicates results in the file being very small meaning too many reads were removed that were considered duplicates.
+        # this results in the next process deeptools not being able to create a normalized bedgraph file
 
-    #samtools flagstat \
-    #"\${out_bam_coor_sort}" \
-    #> "\${flagstats_log}"
+        #samtools markdup \
+        #"\${out_bam_coor_sort}" \
+        #"\${out_bam_final}"
 
-    # adding another way to get stats from each bam file
-    #samtools stats \
-    #"\${out_bam_coor_sort}" \
-    #> "\${samtools_stats_log}"
+        # so i will just use the out file from the coordinate sort samtools sort section instead of using out_bam_final
+        #samtools index \
+        -b \
+        "\${out_bam_coor_sort}"
 
-    # now only putting the stats into a tsv file
-    #less "\${samtools_stats_log}" | grep ^SN | cut -f 2-3 >  "\${tsv_file_with_stats}"
-    
-    """
+        #samtools flagstat \
+        #"\${out_bam_coor_sort}" \
+        #> "\${flagstats_log}"
+
+        # adding another way to get stats from each bam file
+        #samtools stats \
+        #"\${out_bam_coor_sort}" \
+        #> "\${samtools_stats_log}"
+
+        # now only putting the stats into a tsv file
+        #less "\${samtools_stats_log}" | grep ^SN | cut -f 2-3 >  "\${tsv_file_with_stats}"
+        
+        """
+
+
+
+    }
+    else {
+
+        """
+        #!/usr/bin/env bash
+
+        ################# samtools parameters used ################
+        # for samtools view
+        # --min-MQ or -q : takes an INT and will skip alignments with a MAPQ smaller than INT
+        # --bam or -b : output in the bam format
+        # this version of bwa didnt recognize --bam or --min-MQ so i just used -b and -q respetively.
+
+        # for samtools sort
+        # -o : takes a file. it writes the final sorted output to file rather than standard output
+        # -O : write the final output as sam, bam, or cram
+        # -t : sort by tag, used RG for sorting by read group
+
+        # samtools fixmate : preparing for finding the duplicates
+        # -O : specify the format and i choose bam
+        # -m : add ms(mate score) tags. these are used by markdup to select the best reads to keep 
+        # other possible option to look at is -r : remove secondary and unmapped reads ?
+        
+        # for samtools markdup : can only be done on coordinate sorted bam files and run it through samtools fixmate first
+        # -r : remove duplicate reads
+        # --mode or -m : duplicate decision method for paired reads. values are "t" or "s". read documentation but i choose s becasue it tends to return more results. just incase i will remove this option in the pair end mode by adding an if else statement in this process.
+
+        # now for samtools index to get index files
+        # -b, --bai: create a bai index; this version of samtools does not support --bai --csi just use -b -c
+        # -c, --csi: create a csi index
+        # -o, --output: write the output index to a file specified  only when one alignment file is being indexed
+
+        # using samtools flagstat: generate log files so i can use multiqc to get stats of all files into one html file
+        # no parameters needed. just need to give the final bam file that went through all the processing
+        ###########################################################
+
+        # I should add a samtools filtering. looking to only get mapq scores higher than 30
+
+        samtools view \
+        -b \
+        "${sam_files}" \
+        > "${out_bam_filt}" 
+
+        # removed this from above because it messes with samtools markdup: -q 30 \
+        
+        
+        # first i have to name sort to use fixmate
+        samtools sort \
+        -o "${out_bam_name_sort}" \
+        -n \
+        -O bam \
+        "${out_bam_filt}"
+
+
+        samtools fixmate \
+        -O bam \
+        -m \
+        "${out_bam_name_sort}"\
+        "${out_bam_fixmate}"
+
+
+        # now i will coordinate sort here 
+        # will also add the read group sort
+        samtools sort \
+        -o "${out_bam_coor_sort}" \
+        -O bam \
+        "${out_bam_fixmate}"
+
+
+        # Step 4: Mark duplicates (without removing them)
+        samtools markdup "${out_bam_coor_sort}" "${dup_bam}"
+
+        # Step 5: Index final BAM
+        # I need to output this dup_bam and send it to the bam_log_calc process
+        samtools index "${dup_bam}"
+
+        # now to remove the duplicates
+        samtools markdup -r "${dup_bam}" "${no_dup_bam}"
+
+        # then sort and index no_dup_bam to use as input to all other processes
+        samtools sort -o "${no_dup_sort_bam}" -O bam "${no_dup_bam}"
+
+        # then index the no dup sort bam
+
+        samtools index -b "${no_dup_sort_bam}"
+
+
+        # removed this from above because it messes with samtools markdup: -t RG \
+
+
+        # i might need to put coordinate sorted bam into markdup
+        # this works but removing the duplicates results in the file being very small meaning too many reads were removed that were considered duplicates.
+        # this results in the next process deeptools not being able to create a normalized bedgraph file
+
+        #samtools markdup \
+        #"\${out_bam_coor_sort}" \
+        #"\${out_bam_final}"
+
+        # so i will just use the out file from the coordinate sort samtools sort section instead of using out_bam_final
+        #samtools index \
+        -b \
+        "\${out_bam_coor_sort}"
+
+        #samtools flagstat \
+        #"\${out_bam_coor_sort}" \
+        #> "\${flagstats_log}"
+
+        # adding another way to get stats from each bam file
+        #samtools stats \
+        #"\${out_bam_coor_sort}" \
+        #> "\${samtools_stats_log}"
+
+        # now only putting the stats into a tsv file
+        #less "\${samtools_stats_log}" | grep ^SN | cut -f 2-3 >  "\${tsv_file_with_stats}"
+        
+        """
+    }
 
 
 
@@ -1241,6 +1371,7 @@ process bedtools_filt_blacklist {
 process samtools_bl_index {
     //conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools_rj'
     conda '/ru-auth/local/home/rjohnson/miniconda3/envs/samtools-1.21_rj'
+    label 'normal_big_resources'
 
     
 
@@ -1278,6 +1409,8 @@ process samtools_bl_index {
     
     out_bam_name_sort = "${bl_filt_bam.baseName}_sort2.bam"
 
+    
+
     """
     ####### parameters for indexing bam ######
     # -b : will create a bai file
@@ -1299,6 +1432,7 @@ process samtools_bl_index {
     "${out_bam_name_sort}" 
 
     """
+    
 }
 
 process fastp_PE {
@@ -1520,8 +1654,15 @@ process fastplong_PE {
 
     # this creates mismatched reads because some pairs were filtered out in each file leaving no match
     # have to use fastq_pair to fix. which will result in one pair file that has to go into bwa mem
+
+    # i can improve the memory usage and speed by changing the hash table with the -t parameter. take the number of reads in the fastq file and divide by 4
+    # as long as its lower than 436 million wouldn't get this error i think. "cannot allocate the memory for a table size of -436581356." my test with arnolds cadc data came out to this: 201,023,805. should be good enough for other files
+
+    #thread_num=\$((wc -l "\${out_name_1}" | cut -f 1 -d " " / 4 ))
+    thread_num=\$(( \$(wc -l < "${out_name_1}") / 4 ))
+
     
-    fastq_pair "${out_name_1}" "${out_name_2}" 
+    fastq_pair -t \$thread_num "${out_name_1}" "${out_name_2}" 
 
 
     # below are the copied remnent of fastp usage
@@ -1881,6 +2022,7 @@ process bwamem2_PE_aln {
 
         bwa-mem2 mem \
         -t 20 \
+        -T0 \
         -SP5M \
         -R "${read_group_string}" \
         "${genome}" \
@@ -1918,6 +2060,7 @@ process bwamem2_PE_aln {
 
         bwa-mem2 mem \
         -t 20 \
+        -T0 \
         -SP5M \
         "${genome}" \
         "${fastq_r1}" \
@@ -1951,7 +2094,8 @@ process pairtools_analysis_process {
     input:
 
     // the bam index tuple
-    tuple path(bam_file), path(index_file)
+    // tuple path(bam_file), path(bam_index)
+    path(bam_file)
     
     // now the chromsize file
     // this will now be a bunch of genome index files. I have to specify the .fai file in the script now
@@ -1969,6 +2113,9 @@ process pairtools_analysis_process {
 
     // not sure if this can work but try new Date()
     RUN_DATE = new Date().format('yyyy-MM-dd')
+
+    // I am going to add a new command that uses samtools to filter out reads that dont have a pair, to avoid the corrupt XX pairs being reported
+    // bam_file_filtered = "${bam_file.baseName}_cadc_filtered.bam"
 
     // need the output path
     pairs = "${SAMPLE}_parse2_${RUN_DATE}.pairs.gz"
@@ -2011,11 +2158,14 @@ process pairtools_analysis_process {
     #SAMPLE="\$(basename "\${bam_file}" .bam)"
     #RUN_DATE="\$(date +%Y%m%d)"
 
-
+    # filtering the bam file here
+    # not doing this with -F12 anymore but will add it in the samtools_sort process
+    #samtools view 
 
 
 
     # following Lauren's pairtools workflow here
+    # trying --expand instead of --no-expand. change it back if you forgot in pairtools parse2
 
     # 1) parse2
     pairtools parse2 \
