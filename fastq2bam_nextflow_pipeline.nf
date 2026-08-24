@@ -503,7 +503,7 @@ workflow {
     params.ref_genome_size = file('/lustre/fs4/risc_lab/store/risc_data/downloaded/hg38/genome/Sequence/WholeGenomeFasta/genome.fa.fai')
     ref_genome_size_ch = Channel.value(params.ref_genome_size)
 
-    if (params.genome && !params.ref_genome_size || !params.blacklist_path){
+    if (params.genome && !params.ref_genome_size || !params.blacklist_path && params.BL){
         throw new Exception( """ Please, if you decided to use a new genome file, provide a path to a new chromosome size file also which will be a .fai file. And provide a new blacklist file that matches the genome file  """)
     }
 
@@ -1166,6 +1166,8 @@ workflow {
 
             bam_index_tuple_ch = samtools_sort.out.bam_index_tuple
             bam_index_tuple_for_stats_ch = samtools_sort.out.bam_index_tuple_for_stats
+            name_sorted_bam_for_cadc = samtools_sort.out.name_sort_bam // this is an optional output
+            name_sorted_bam_for_cadc.view{it -> "this is the name sorted channel for cadc bam files: $it"}
 
 
 
@@ -1369,7 +1371,12 @@ workflow {
         // the parameter will be "params.ref_genome_size"
 
         // now to change from using the user specified chromosome size file and using the .fai chromosome size file that is created from the bwa index genome process genome_index_ch
-        pairtools_analysis_process(bam_index_tuple_ch, ref_genome_size_ch )
+        // have to use a name sorted bam now not the bam index tuple name_sorted_bam_for_cadc
+
+        // check the channel
+        // name_sorted_bam_for_cadc.view{it -> "this is the name sorted channel for cadc bam files: $it"}
+        pairtools_analysis_process(name_sorted_bam_for_cadc, ref_genome_size_ch )
+        //pairtools_analysis_process(bam_index_tuple_ch, ref_genome_size_ch )
         // pairtools_analysis_process(bam_index_tuple_ch, genome_index_ch )
     }
 
