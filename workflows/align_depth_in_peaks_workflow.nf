@@ -2,6 +2,7 @@
 
 include {
     overlap_window
+    python_overlap_window_process
 
 } from '../modules/fastq2bam_dna_modules.nf'
 
@@ -47,6 +48,8 @@ workflow align_depth_in_peaks_workflow {
         
         
         overlap_window(combined_bed_peak)
+        
+        
 
         multi_intersect_tsv_ch = overlap_window.out.tsv_qc_files
     
@@ -66,52 +69,129 @@ workflow align_depth_in_peaks_workflow {
 
     if (params.gloe_seq){
 
-        multi_intersect_tsv_ch
-            .collectFile(name: 'gloe_seq_alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
-            .map{file ->
-                lines = file.text.readLines()
-                header = lines[0]
-                data = lines[1..-1]
-                .collect {it.split('\t')}
-                .sort{row -> row[1]}
-                .collect{it.join("\t")}
-                return ([header] + data).join("\n")
+        // i can try to split the files by the last field
+        multi_intersect_tsv_ch.map { file ->
+
+            file_basename = file.baseName
+
+            tokens = file_basename.tokenize("_")
+
+            grouping_name = tokens[-1]
+
+
+
+            [file, grouping_name]
+
+
+
+        }
+        .groupTuple(by: 1)
+        // .view{it -> "checking the file names for intersect to see if they grouped: $it"}
+        .set{new_multi_intersect_tsv}
+
+
+
+        python_overlap_window_process(new_multi_intersect_tsv)
+
+        // // trying to make two full tables
+        // for (sample in new_multi_intersect_tsv[1] ) {
+        //     new_multi_intersect_tsv[:,sample]
+        //         .collectFile(name: 'gloe_seq_alignmentReads_in_peaks_depth_'${sample}'.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
+        //         .map{file ->
+        //             lines = file.text.readLines()
+        //             header = lines[0]
+        //             data = lines[1..-1]
+        //             .collect {it.split('\t')}
+        //             .sort{row -> row[1]}
+        //             .collect{it.join("\t")}
+        //             return ([header] + data).join("\n")
+                
+                
+        //         }
+        //         .subscribe { sorted_data ->
+                
+        //             file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/gloe_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
+        //             file_name.text = sorted_data
+                
+                
+        //         }
+        //         .set{spike_in_reads_in_peaks_depth_sorted_ch}
+        // }
+
+        // multi_intersect_tsv_ch
+        //     .collectFile(name: 'gloe_seq_alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
+        //     .map{file ->
+        //         lines = file.text.readLines()
+        //         header = lines[0]
+        //         data = lines[1..-1]
+        //         .collect {it.split('\t')}
+        //         .sort{row -> row[1]}
+        //         .collect{it.join("\t")}
+        //         return ([header] + data).join("\n")
             
             
-            }
-            .subscribe { sorted_data ->
+        //     }
+        //     .subscribe { sorted_data ->
             
-                file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/gloe_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
-                file_name.text = sorted_data
+        //         file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/gloe_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
+        //         file_name.text = sorted_data
             
             
-            }
-            .set{spike_in_reads_in_peaks_depth_sorted_ch}
+        //     }
+        //     .set{spike_in_reads_in_peaks_depth_sorted_ch}
     }
 
     if (params.end_seq){
 
-        multi_intersect_tsv_ch
-        .collectFile(name: 'end_seq_alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
-        .map{file ->
-            lines = file.text.readLines()
-            header = lines[0]
-            data = lines[1..-1]
-            .collect {it.split('\t')}
-            .sort{row -> row[1]}
-            .collect{it.join("\t")}
-            return ([header] + data).join("\n")
-        
-        
+        // dont need a separate end-seq part here, but will still do so for when the user specifies end seq
+        // i think it will work??
+        multi_intersect_tsv_ch.map { file ->
+
+            file_basename = file.baseName
+
+            tokens = file_basename.tokenize("_")
+
+            grouping_name = tokens[-1]
+
+
+
+            [file, grouping_name]
+
+
+
         }
-        .subscribe { sorted_data ->
+        .groupTuple(by: 1)
+        // .view{it -> "checking the file names for intersect to see if they grouped: $it"}
+        .set{new_multi_intersect_tsv}
+
+
+
+        python_overlap_window_process(new_multi_intersect_tsv)
+
+
+
+
+        // multi_intersect_tsv_ch
+        // .collectFile(name: 'end_seq_alignmentReads_in_peaks_depth.tsv', keepHeader: true, storeDir: "${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth" )
+        // .map{file ->
+        //     lines = file.text.readLines()
+        //     header = lines[0]
+        //     data = lines[1..-1]
+        //     .collect {it.split('\t')}
+        //     .sort{row -> row[1]}
+        //     .collect{it.join("\t")}
+        //     return ([header] + data).join("\n")
         
-            file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/end_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
-            file_name.text = sorted_data
+        
+        // }
+        // .subscribe { sorted_data ->
+        
+        //     file_name = file("${params.base_out_dir}/alignment_peak_overlap_qc/complete_intersection_depth/end_seq_alignmentReads_in_peaks_depth_sorted2.tsv")
+        //     file_name.text = sorted_data
         
         
-        }
-        .set{spike_in_reads_in_peaks_depth_sorted_ch}
+        // }
+        // .set{spike_in_reads_in_peaks_depth_sorted_ch}
     }
 
 

@@ -1577,19 +1577,7 @@ workflow {
 
     if (params.depth_intersection){
 
-        // bed_files_norm_ch
-        //     .map { file -> tuple(file.baseName, file)}
-        //     .map { name, file -> 
-        //         tokens = name.tokenize("_") // there are 16 fields in the tokens now. I want the 3rd field 0Gy, cells, plc
-        //         tuple(tokens, name, file)
-        //     }
-        //     .map {tokens, name, file ->
-            
-        //         ["${tokens[0]}_${tokens[1]}",tokens[2], name, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
-            
-        //     }
-        //     .groupTuple(by:0) // the first element of the tuple is grouped by default. it is 0 based counting.
-        //     .set { grouped_bed_ch}
+       
         bed_files_norm_ch
             .collect()
             .flatten()
@@ -1608,11 +1596,17 @@ workflow {
                             tuple(tokens, basename, filename, file)
                         }
                         .map {tokens, basename, filename, file ->
-                        
-                            ["${tokens[0]}_${tokens[1]}",tokens[2], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
-                        
+                            // since I allowed the user to set where each field in the fastq file name is
+                            // that made a different downstream process make the bed files have the correct order "codition_name"_"experiment_name"_"replicate"
+                            // ["${tokens[0]}_${tokens[1]}",tokens[2], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                            // so below I will copy and paste the new order i need this channel to be structured
+                            ["${tokens[0]}_${tokens[2]}",tokens[1], basename, filename, file]
+    
+
                         }
-                        .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.
+                        // try not grouping
+                        // .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.
+                        .view{it -> "this is the overlap window input channel: $it" } // I need to look at how these are grouped. turns out if some conditions dont have a experiment type with the same number of replicates, we will get a null in one fo the columns 
                         .set { grouped_bed_ch}
         }
         if (params.end_seq){
@@ -1627,7 +1621,12 @@ workflow {
                         }
                         .map {tokens, basename, filename, file ->
                         
-                            ["${tokens[0]}_${tokens[3]}",tokens[1], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+                            // it shouldnt matter if it is end seq or gloe seq now.
+                            // the pipeline puts everything in a standard order, the user just has to specify the order with parameters
+                            // ["${tokens[0]}_${tokens[3]}",tokens[1], basename, filename, file] // I needed to recreate the first two fields to get the files that share the same base name so i can group them and put them into the workflow.
+
+                            // should be the same order
+                            ["${tokens[0]}_${tokens[2]}",tokens[1], basename, filename, file]
                         
                         }
                         .groupTuple(by:0, sort: true) // the first element of the tuple is grouped by default. it is 0 based counting.

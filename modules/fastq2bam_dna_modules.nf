@@ -3226,16 +3226,28 @@ process make_bigwig_gloe_process {
     """
     #!/usr/bin/env bash
 
+
+    # so the fix is to find which mitochontrial chr is in the file
+    # this will look for either chrM or chrMT and save only one instance in the variable
+    # all instances should be the same, but I dont know which type it is M or MT
+
+    #mito_chr=\$(samtools view ${bam} |awk 'BEGIN {FS ="\t"} {print \$3}'| grep "chrM.*"| head -n 1)
+
+    #or
+    mito_chr=\$(samtools view ${bam} | awk -F'\t' '\$3 ~ /^chrM/ {print \$3; exit}'| grep "chrM.*"| head -n 1)
+
     bamCoverage \
     --bam ${bam} \
     --normalizeUsing RPGC \
-    --region chrMT \
     --Offset 1 \
     --binSize 1 \
+    --region \$mito_chr \
     --effectiveGenomeSize "${params.num_effectiveGenomeSize}" \
     --outFileName "${base_bam_name}" \
     --outFileFormat "bigwig"
 
+    # I need to figure out how to choose between if the chromosome is labeled chrMT or chrM
+    # --region chrMT \
 
 
 
@@ -3603,6 +3615,8 @@ process py_calc_stats_log {
 
 process overlap_window {
 
+    // outputing the tsv files so i can work with them
+    publishDir "./test_use_qc_overlap_files", mode: 'copy', pattern: '*'
     // this process might have 945 instances  17 bedfiles times the number of peakfiles
 
     label 'super_small_resources'
@@ -3617,7 +3631,11 @@ process overlap_window {
 
     // the order of the condition and everything else is 0GyP, PLC, 0GyC, Cells
 
-    tuple val(grouping_name), val(condition), val(basename), val(filename), path(bedfiles), path(peakfile)
+    // changing the values in the channel so that condition is now experiment_type
+    // tuple val(grouping_name), val(condition), val(basename), val(filename), path(bedfiles), path(peakfile)
+
+    // new channel structure. the replicate number is part of the grouping name now
+    tuple val(grouping_name), val(experiment_type), val(basename), val(filename), path(bedfiles), path(peakfile)
 
     //path(peaks)
 
@@ -3640,15 +3658,28 @@ process overlap_window {
 
     if (params.gloe_seq){
 
-        out_0GyP = "${basename[1]}_intersect_${peakfile}.bed"
+        // I need to just add the replicate number onto the condition for making the sample names below
+        //  then I still need the experiment type, which is 0gy or 300gy etc
+        // update this process to take a new value which is the replicate number
 
-        out_0GyC = "${basename[0]}_intersect_${peakfile}.bed"
+        // out_0GyP = "${basename[1]}_intersect_${peakfile}.bed"
 
-        out_plc = "${basename[3]}_intersect_${peakfile}.bed"
+        // if there is only one basename, why am i doing 4 here??
+        // and there is only one peak file. I guess I didnt concat the input channel. but it might be best not to now anyway
+        out_only = "${basename}_intersect_${peakfile}.bed"
 
-        out_cells = "${basename[2]}_intersect_${peakfile}.bed"
+        // out_1 = "${basename[1]}_intersect_${peakfile}.bed"
 
-        tsv_qc_file = "qc_${grouping_name}_overlap_${peakfile}.tsv"
+        // out_0GyC = "${basename[0]}_intersect_${peakfile}.bed"
+        // out_0 = "${basename[0]}_intersect_${peakfile}.bed"
+
+        // out_plc = "${basename[3]}_intersect_${peakfile}.bed"
+        // out_3 = "${basename[3]}_intersect_${peakfile}.bed"
+
+        // out_cells = "${basename[2]}_intersect_${peakfile}.bed"
+        // out_2 = "${basename[2]}_intersect_${peakfile}.bed"
+
+        tsv_qc_file = "qc_${grouping_name}_overlap_${peakfile}_experiment_type_${experiment_type}.tsv"
 
 
         """
@@ -3660,63 +3691,98 @@ process overlap_window {
         # using -i inplace with awk only works if you have gawk version, and this hpc does so I am fine with editing the file without changing the name.
 
         # 0Gyp
-        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[1]}  
+        #awk -i inplace '{print \$1"\t"\$2"\t"\$3}' \${filename[1]}  
 
         # 0Gyc
-        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[0]}
+        #awk -i inplace '{print \$1"\t"\$2"\t"\$3}' \${filename[0]}
 
         # plc 
-        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[3]}
+        #awk -i inplace '{print \$1"\t"\$2"\t"\$3}' \${filename[3]}
 
         # cells
-        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename[2]}
+        #awk -i inplace '{print \$1"\t"\$2"\t"\$3}' \${filename[2]}
 
         # peakfile
-        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${peakfile}
+        #awk -i inplace '{print \$1"\t"\$2"\t"\$3}' \${peakfile}
+
+        #there is only one filename so 
+        awk -i inplace '{print \$1"\t"\$2"\t"\$3}' ${filename}  
 
         # first get all of the counts for reads the a bam file in each condition that intersect with the peaks in each peak files
 
         # lets do debugging
 
-        echo "this is the 0GyP: ${filename[1]} , the 0GyC: ${filename[0]} this is plc: ${filename[3]}, this is cells: ${filename[2]}, and this is the peak file: ${peakfile}"
+        #echo "this is the 0GyP, out_1: \${filename[1]}, \${experiment_type[1]}; , the 0GyC, out_0: \${filename[0]}, \${experiment_type[0]}; this is plc, out_3: \${filename[3]}, \${experiment_type[3]}; this is cells, out_2: \${filename[2]}, \${experiment_type[2]}; and this is the peak file: \${peakfile}"
 
         # now I just need to run bedtools on each of the 4 files in each process instance (17 total instances) but multiplied by now adding the peak files through the combine operator
         
-        # first 0GyP
-        bedtools window -a ${peakfile} -b ${filename[1]} -w 150 -bed > ${out_0GyP} 
+        # first 0GyP, out_1
+        #bedtools window -a \${peakfile} -b \${filename[1]} -w 150 -bed > \${out_0GyP}
+        #bedtools window -a \${peakfile} -b \${filename[1]} -w 150 -bed > \${out_1} 
 
-        gyp_counts=\$(less ${out_0GyP} | wc -l)
-        total_gyp_counts=\$(less ${filename[1]} | wc -l)
-        percent_gyp=\$(awk "BEGIN {print (\$gyp_counts/(\$total_gyp_counts+1))*100}" )
+        #gyp_counts=\$(less \${out_0GyP} | wc -l)
+        #total_gyp_counts=\$(less \${filename[1]} | wc -l)
+        #percent_gyp=\$(awk "BEGIN {print (\$gyp_counts/(\$total_gyp_counts+1))*100}" )
+
+        
+        #out1_counts=\$(less \${out_1} | wc -l)
+        #total_out1_counts=\$(less \${filename[1]} | wc -l)
+        #percent_out1=\$(awk "BEGIN {print (\$out1_counts/(\$total_out1_counts+1))*100}" )
 
         # second 0GyC
-        bedtools window -a ${peakfile} -b ${filename[0]} -w 150 -bed > ${out_0GyC}
+        #bedtools window -a \${peakfile} -b \${filename[0]} -w 150 -bed > \${out_0GyC}
+        #bedtools window -a \${peakfile} -b \${filename[0]} -w 150 -bed > \${out_0}
         
-        gyc_counts=\$(less ${out_0GyC} | wc -l)
-        total_gyc_counts=\$(less ${filename[0]} | wc -l)
-        percent_gyc=\$(awk "BEGIN {print (\$gyc_counts/(\$total_gyc_counts+1))*100}" )
+        #gyc_counts=\$(less \${out_0GyC} | wc -l)
+        #total_gyc_counts=\$(less \${filename[0]} | wc -l)
+        #percent_gyc=\$(awk "BEGIN {print (\$gyc_counts/(\$total_gyc_counts+1))*100}" )
+
+        #out0_counts=\$(less \${out_0} | wc -l)
+        #total_out0_counts=\$(less \${filename[0]} | wc -l)
+        #percent_out0=\$(awk "BEGIN {print (\$out0_counts/(\$total_out0_counts+1))*100}" )
 
         # third plc
-        bedtools window -a ${peakfile} -b ${filename[3]} -w 150 -bed > ${out_plc} 
+        #bedtools window -a \${peakfile} -b \${filename[3]} -w 150 -bed > \${out_plc} 
+        #bedtools window -a \${peakfile} -b \${filename[3]} -w 150 -bed > \${out_3} 
 
-        plc_counts=\$(less ${out_plc} | wc -l)
-        total_plc_counts=\$(less ${filename[3]} | wc -l)
-        percent_plc=\$(awk "BEGIN {print (\$plc_counts/(\$total_plc_counts+1))*100}" )
+        #plc_counts=\$(less \${out_plc} | wc -l)
+        #total_plc_counts=\$(less \${filename[3]} | wc -l)
+        #percent_plc=\$(awk "BEGIN {print (\$plc_counts/(\$total_plc_counts+1))*100}" )
+
+        #out3_counts=\$(less \${out_3} | wc -l)
+        #total_out3_counts=\$(less \${filename[3]} | wc -l)
+        #percent_out3=\$(awk "BEGIN {print (\$out3_counts/(\$total_out3_counts+1))*100}" )
 
 
         # fourth cells
-        bedtools window -a ${peakfile} -b ${filename[2]} -w 150 -bed > ${out_cells} 
+        #bedtools window -a \${peakfile} -b \${filename[2]} -w 150 -bed > \${out_cells} 
+        #bedtools window -a \${peakfile} -b \${filename[2]} -w 150 -bed > \${out_2}
 
-        cells_counts=\$(less ${out_cells} | wc -l)
-        total_cell_counts=\$(less ${filename[2]} | wc -l)
-        percent_cell=\$(awk "BEGIN {print (\$cells_counts/(\$total_cell_counts+1))*100}" )
+        #cells_counts=\$(less \${out_cells} | wc -l)
+        #total_cell_counts=\$(less \${filename[2]} | wc -l)
+        #percent_cell=\$(awk "BEGIN {print (\$cells_counts/(\$total_cell_counts+1))*100}" )
+
+        #out2_counts=\$(less \${out_2} | wc -l)
+        #total_out2_counts=\$(less \${filename[2]} | wc -l)
+        #percent_out2=\$(awk "BEGIN {print (\$out2_counts/(\$total_out2_counts+1))*100}" )
+
+        # just do one
+        bedtools window -a ${peakfile} -b ${filename} -w 150 -bed > ${out_only}
+        outonly_counts=\$(less ${out_only} | wc -l)
+        total_outonly_counts=\$(less ${filename} | wc -l)
+        percent_outonly=\$(awk "BEGIN {print (\$outonly_counts/(\$total_outonly_counts+1))*100}" )
 
         # now I need to get the word count of each of the conditions, that will represent how many reads are in a this instanced peak file for each condition
 
-        echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0GyP\ttotal_0GyC\ttotal_PlC\ttotal_cells\tpercent_GyP\tpercent_GyC\tpercent_PLC\tpercent_cells" > ${tsv_qc_file} # this is the header
-        echo -e "${grouping_name}\t${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}\t\${percent_gyp}\t\${percent_gyc}\t\${percent_plc}\t\${percent_cell}" >> ${tsv_qc_file} 
+        #echo -e "File_base_name\tpeak_file_name\t0GyP_in_peak\t0GyC_in_peak\tPLC_in_peak\tcells(200)_in_peak\ttotal_0GyP\ttotal_0GyC\ttotal_PlC\ttotal_cells\tpercent_GyP\tpercent_GyC\tpercent_PLC\tpercent_cells" > \${tsv_qc_file} # this is the header
+        #echo -e "\${grouping_name}\t\${peakfile}\t\${gyp_counts}\t\${gyc_counts}\t\${plc_counts}\t\${cells_counts}\t\${total_gyp_counts}\t\${total_gyc_counts}\t\${total_plc_counts}\t\${total_cell_counts}\t\${percent_gyp}\t\${percent_gyc}\t\${percent_plc}\t\${percent_cell}" >> \${tsv_qc_file}
 
+        #echo -e "File_base_name\tpeak_file_name\t\${experiment_type[1]}\t\${experiment_type[0]}\t\${experiment_type[3]}\t\${experiment_type[2]}\ttotal_\${experiment_type[1]}\ttotal_\${experiment_type[0]}\ttotal_\${experiment_type[3]}\ttotal_\${experiment_type[2]}\tpercent_\${experiment_type[1]}\tpercent_\${experiment_type[0]}\tpercent_\${experiment_type[3]}\tpercent_\${experiment_type[2]}" > \${tsv_qc_file} # this is the header
+        #echo -e "\${grouping_name}\t\${peakfile}\t\${out1_counts}\t\${out0_counts}\t\${out3_counts}\t\${out2_counts}\t\${total_out1_counts}\t\${total_out0_counts}\t\${total_out3_counts}\t\${total_out2_counts}\t\${percent_out1}\t\${percent_out0}\t\${percent_out3}\t\${percent_out2}" >> \${tsv_qc_file} 
 
+        # now instead of grouping the channel, just input everything separately, and then change the file manipulator after this channel to stack differently
+        echo -e "File_base_name\tpeak_file_name\t${experiment_type}\ttotal_${experiment_type}\tpercent_${experiment_type}" > ${tsv_qc_file} # this is the header
+        echo -e "${grouping_name}\t${peakfile}\t\${outonly_counts}\t\${total_outonly_counts}\t\${percent_outonly}\t" >> ${tsv_qc_file} 
 
 
         """
@@ -3805,6 +3871,69 @@ process overlap_window {
 
     }
 
+}
+
+process python_overlap_window_process {
+
+    publishDir "${params.base_out_dir}/overlap_histone_marks_analysis", mode: 'copy', pattern: '*'
+
+    conda '/ru-auth/local/home/rjohnson/miniconda3/envs/python_w_packages_rj'
+
+    label 'normal_big_resources'
+
+
+    input:
+    tuple path(list_of_files), val(experiment_type)
+    
+
+
+    output:
+    path("${file_name_out}"), emit: tsv_condition_overlap_files
+
+
+    script:
+
+    file_name_out = "overlap_qc_${experiment_type}.tsv"
+    files_list = list_of_files.collect{"\"${it}\""}.join(',')
+
+
+    """
+    #!/usr/bin/env python
+
+    from pathlib import Path
+    import pandas as pd
+
+    tsv_pathname = "./"
+    tsv_test2 = Path("./")
+    all_files = [f.name for f in tsv_test2.glob("*${experiment_type}*")]
+
+    #print(all_files)
+
+    experiment_type = "${experiment_type}"
+
+    list_of_files = [${files_list}]
+    print(list_of_files)
+
+    temp_df = pd.DataFrame()
+
+    for file in list_of_files:
+
+        # temp_df = pd.DataFrame()
+        
+        file_df = pd.read_csv(tsv_pathname+file, sep='\t', index_col = False)
+        temp_df = pd.concat([file_df,temp_df], axis = 0)
+
+    #temp_df.to_csv('overlap_qc_'+experiment_type+'.tsv', sep = '\t', index = False)
+    temp_df.to_csv("${file_name_out}", sep = '\t', index = False)
+
+    
+
+
+
+
+
+
+    """
 }
 
 
